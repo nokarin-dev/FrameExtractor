@@ -42,8 +42,14 @@ jobs:
 
       - name: Archive executable
         run: |
-          mkdir release
-          cp dist/fe* release/
+          mkdir -p release
+          if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]; then
+            cp dist/fe release/fe-linux
+          elif [[ "${{ matrix.os }}" == "macos-latest" ]]; then
+            cp dist/fe release/fe-macos
+          elif [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+            cp dist/fe release/fe-windows
+          fi
 
       - name: Upload Release Artifact
         uses: actions/upload-artifact@v4
