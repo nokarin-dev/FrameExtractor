@@ -63,12 +63,12 @@ jobs:
       - name: Generate Changelog (Conventional Commits)
         id: changelog
         run: |
-          LAST_TAG=$(git describe --tags --abbrev=0 HEAD^ || echo "")
-          echo "LAST_TAG=$LAST_TAG" >> $GITHUB_ENV
-          if [ -n "$LAST_TAG" ]; then
-            git log "$LAST_TAG"..HEAD --pretty=format:"%s" > raw_log.txt
-          else
+          LAST_TAG=$(git tag --sort=-creatordate | head -n 1)
+          if [ -z "$LAST_TAG" ]; then
+            echo "No previous tag found."
             git log --pretty=format:"%s" > raw_log.txt
+          else
+            git log "$LAST_TAG"..HEAD --pretty=format:"%s" > raw_log.txt
           fi
 
           echo "CHANGELOG<<EOF" >> $GITHUB_OUTPUT
@@ -95,6 +95,7 @@ jobs:
           draft: false
           prerelease: false
           update_existing: true
+          files: artifacts/**/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
