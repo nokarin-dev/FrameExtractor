@@ -1,37 +1,40 @@
 name: Build Executables
 
 on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+    push:
+        branches: [ main ]
+    pull_request:
+        branches: [ main ]
 
 jobs:
-  build:
-    name: Build for ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+    build:
+        name: Build for ${{ matrix.os }}
+        runs-on: ${{ matrix.os }}
+        strategy:
+            matrix:
+                os: [ubuntu-latest, windows-latest, macos-latest]
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v3
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
+            - name: Set up Python
+              uses: actions/setup-python@v4
+              with:
+                python-version: '3.11'
 
-      - name: Install dependencies
-        run: pip install pyinstaller
+            - name: Install dependencies
+              run: pip install pyinstaller
 
-      - name: Build executable
-        run: |
-          pyinstaller --onefile --name fe FrameExtractor.py
+            - name: Build executable
+              run: |
+                pyinstaller --onefile --name vidsnap video_to_frames.py \
+                    --exclude-module libcrypto.so.3 \
+                    --exclude-module libssl.so.3
 
-      - name: Upload Executable Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: fe-${{ matrix.os }}
-          path: dist/fe*
+
+            - name: Upload Executable Artifact
+              uses: actions/upload-artifact@v4
+              with:
+                name: fe-${{ matrix.os }}
+                path: dist/fe*
