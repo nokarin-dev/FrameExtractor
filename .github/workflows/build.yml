@@ -28,7 +28,7 @@ jobs:
 
             - name: Build executable
               run: |
-                pyinstaller --onefile --name vidsnap video_to_frames.py \
+                pyinstaller --onefile --name fe FrameExtractor.py \
                     --exclude-module libcrypto.so.3 \
                     --exclude-module libssl.so.3
 
