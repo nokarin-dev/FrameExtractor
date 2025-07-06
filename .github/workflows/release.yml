@@ -75,9 +75,9 @@ jobs:
           echo "### Changelog for ${{ github.ref_name }}" >> $GITHUB_OUTPUT
           echo >> $GITHUB_OUTPUT
 
-          grep '^feat' raw_log.txt | sed 's/^/- ✨ /' >> $GITHUB_OUTPUT || true
-          grep '^fix' raw_log.txt | sed 's/^/- 🐛 /' >> $GITHUB_OUTPUT || true
-          grep -vE '^(feat|fix)' raw_log.txt | sed 's/^/- 🔧 /' >> $GITHUB_OUTPUT || true
+          grep '^feat' raw_log.txt | sed 's/^/- /' >> $GITHUB_OUTPUT || true
+          grep '^fix' raw_log.txt | sed 's/^/- /' >> $GITHUB_OUTPUT || true
+          grep -vE '^(feat|fix)' raw_log.txt | sed 's/^/- /' >> $GITHUB_OUTPUT || true
 
           echo "EOF" >> $GITHUB_OUTPUT
 
@@ -94,14 +94,6 @@ jobs:
           body: ${{ steps.changelog.outputs.CHANGELOG }}
           draft: false
           prerelease: false
-          update_existing: true
-          files: artifacts/**/*
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload Executables to Release
-        uses: softprops/action-gh-release@v2
-        with:
           files: artifacts/**/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
