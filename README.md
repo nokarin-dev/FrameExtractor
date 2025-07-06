@@ -1,4 +1,10 @@
 # FrameExtractor
+<div align="center">
+  
+  [![Build Status](https://github.com/nokarin-dev/FrameExtractor/actions/workflows/build.yml/badge.svg)](https://github.com/nokarin-dev/FrameExtractor/actions/workflows/build.yml)
+
+</div>
+
 **FrameExtractor** is a powerful cross-platform CLI tool to extract frames from videos using FFmpeg.  
 It supports custom frame rate (FPS), time range trimming, custom filename prefix, and output format (PNG, JPG, JPEG).  
 Designed to be simple, fast, and developer-friendly.
