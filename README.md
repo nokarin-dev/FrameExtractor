@@ -27,7 +27,7 @@ Designed to be simple, fast, and developer-friendly.
 
 # Usage (CLI)
 ```bash
-$ python video_to_frames.py
+$ python FrameExtractor.py
 ```
 
 ---
