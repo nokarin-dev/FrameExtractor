@@ -20,7 +20,7 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v3
 
-      - name: Install Dependencies (Ubuntu)
+      - name: Install Dependencies (Linux)
         if: matrix.os == 'ubuntu-latest'
         uses: jurplel/install-qt-action@v3
         with:
@@ -101,6 +101,9 @@ jobs:
         with:
           version: '6.7.1'
           target: 'desktop'
+
+      - name: Installing FUSE
+        run: sudo apt install libfuse2
 
       - name: Build App
         run: |
