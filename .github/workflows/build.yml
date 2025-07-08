@@ -72,6 +72,7 @@ jobs:
           hdiutil create FrameExtractor.dmg -volname FrameExtractor -srcfolder build/
 
       - name: Archive Binaries
+        shell: bash
         run: |
           mkdir -p release
           if [ "$RUNNER_OS" = "Windows" ]; then
