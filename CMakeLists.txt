@@ -23,6 +23,10 @@ target_link_libraries(FrameExtractor
 Qt6::Widgets
 )
 
+if (WIN32)
+    target_link_libraries(FrameExtractor dwmapi)
+endif()
+
 # Optional: install target to AppDir structure
 install(TARGETS FrameExtractor DESTINATION usr/bin)
 install(FILES packaging/FrameExtractor.desktop DESTINATION .)
