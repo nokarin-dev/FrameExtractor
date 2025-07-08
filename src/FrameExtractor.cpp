@@ -18,6 +18,12 @@
 #include <QGraphicsDropShadowEffect>
 #include <QMouseEvent>
 
+#ifdef Q_OS_WIN
+#include <windows.h>
+#include <dwmapi.h>
+#pragma comment(lib, "dwmapi.lib")
+#endif
+
 #include "utils/find_ffmpeg.h"
 
 class RoundedWindow : public QWidget {
@@ -55,9 +61,6 @@ protected:
 
     void enableBlur() {
         #ifdef Q_OS_WIN
-        #include <windows.h>
-        #include <dwmapi.h>
-        #pragma comment(lib, "dwmapi.lib")
         HWND hwnd = (HWND)winId();
 
         DWM_BLURBEHIND bb = {};

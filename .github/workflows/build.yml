@@ -119,6 +119,7 @@ jobs:
           cp packaging/AppRun AppDir/
           chmod +x AppDir/AppRun
           cp packaging/FrameExtractor.desktop AppDir/
+          cp packaging/icon.png AppDir/
 
       - name: Build AppImage
         run: |
