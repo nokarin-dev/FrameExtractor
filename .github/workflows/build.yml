@@ -82,6 +82,7 @@ jobs:
           else
             cp build/FrameExtractor release/FrameExtractor-linux
             cp frameextractorqt.deb release/FrameExtractor.deb
+          fi
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
@@ -106,7 +107,7 @@ jobs:
           mkdir -p build
           cd build
           cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="${Qt6_DIR}"
-          make --build . --config Release
+          cmake --build . --config Release
 
       - name: Prepare AppDir
         run: |
