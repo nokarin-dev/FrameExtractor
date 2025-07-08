@@ -55,6 +55,9 @@ protected:
 
     void enableBlur() {
         #ifdef Q_OS_WIN
+        #include <windows.h>
+        #include <dwmapi.h>
+        #pragma comment(lib, "dwmapi.lib")
         HWND hwnd = (HWND)winId();
 
         DWM_BLURBEHIND bb = {};
