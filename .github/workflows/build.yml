@@ -30,14 +30,14 @@ jobs:
         if: matrix.os == 'windows-latest'
         uses: jurplel/install-qt-action@v3
         with:
-          version: '5.15.2'
+          version: '6.7.1'
           target: 'desktop'
 
       - name: Install Dependencies (macOS)
         if: matrix.os == 'macos-latest'
         uses: jurplel/install-qt-action@v3
         with:
-          version: '5.15.2'
+          version: '6.7.1'
           target: 'desktop'
 
       - name: Build App
@@ -97,14 +97,17 @@ jobs:
       - name: Install Qt + tools
         run: |
           sudo apt update
-          sudo apt install -y qtbase5-dev qt5-qmake cmake g++ appstream appimagetool
+          sudo apt install -y qtbase5-dev qt5-qmake cmake g++ appstream
+          wget -q https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x appimagetool-x86_64.AppImage
+          sudo mv appimagetool-x86_64.AppImage /usr/local/bin/appimagetool
 
       - name: Build App
         run: |
           mkdir -p build
           cd build
-          cmake .. -DCMAKE_BUILD_TYPE=Release
-          make
+          cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="${Qt6_DIR}"
+          make --build . --config Release
 
       - name: Prepare AppDir
         run: |
