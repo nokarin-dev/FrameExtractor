@@ -1,34 +1,63 @@
 # FrameExtractor
-<div align="center">
-  
-  [![Build Status](https://github.com/nokarin-dev/FrameExtractor/actions/workflows/build.yml/badge.svg)](https://github.com/nokarin-dev/FrameExtractor/actions/workflows/build.yml)
 
+<div align="center">
+  <img src="https://img.shields.io/github/v/release/nokarin-dev/FrameExtractor?style=flat-square" />
+  <a href="https://github.com/nokarin-dev/FrameExtractor/actions/workflows/build.yml">
+    <img src="https://github.com/nokarin-dev/FrameExtractor/actions/workflows/build.yml/badge.svg" alt="Build Status" />
+  </a>
 </div>
 
-**FrameExtractor** is a powerful cross-platform CLI tool to extract frames from videos using FFmpeg.  
-It supports custom frame rate (FPS), time range trimming, custom filename prefix, and output format (PNG, JPG, JPEG).  
-Designed to be simple, fast, and developer-friendly.
+**FrameExtractor** is a modern, cross-platform, GUI-based video frame extractor built using Qt 6 and FFmpeg. It allows you to extract specific frame ranges from any video file with customizable FPS, image format, and naming options.
 
 ---
 
 # Features
-- Extract frames from any video file
-- Select custom start and end time (e.g., 00:10 to 00:20)
-- Control frame rate (e.g., 1 fps, 10 fps, 30 fps)
-- Custom frame filename prefix (e.g., `myframe1.jpg`)
-- Output directory auto-generated or user-defined
-- Choose image format: `png`, `jpg`, or `jpeg`
-- FFmpeg log written to `frame.log`
-- Real-time terminal progress bar
-- Auto-check and offer to install FFmpeg if missing
-- Build-ready as single executable for Windows, Linux, and macOS
+- Extract frames from a specific time range (e.g. `00:00:05` to `00:00:10`)
+- Adjustable frame rate (1–60 FPS)
+- Choose between PNG, JPG, or JPEG output formats
+- Customizable filename prefix (e.g. `my_frame001.png`)
+- Cross-platform: Windows, Linux (AppImage), macOS
 
 ---
 
-# Usage (CLI)
+# Usage
+### 1. Download the executable
+Head to the [Releases page](https://github.com/nokarin-dev/FrameExtractor/releases) and download the latest version for your platform:
+- `FrameExtractor.exe` (Windows)
+- `FrameExtractor.AppImage` (Linux)
+- (macOS version coming soon)
+
+### 2. Extract frames:
+- Load your video file
+- Set start & end time (format HH:MM:SS)
+- Choose FPS, file format, and output directory
+- Select output folder and click Extract
+
+---
+
+# Build
+## Dependencies
+- Qt 6.2+ (tested with Qt 6.6)
+- CMake (or qmake)
+- C++17 or later
+- FFmpeg in system PATH
+
+## Linux/macOS
 ```bash
-$ python video_to_frames.py
+mkdir build && cd build
+cmake ..
+make
+./FrameExtractor
 ```
+
+## Windows (MSVC or MinGW)
+**Use Qt Creator or**:
+```bash
+mkdir build && cd build
+cmake .. -G "MinGW Makefiles"
+mingw32-make
+```
+Or open the .pro / CMakeLists.txt in Qt Creator.
 
 ---
 

@@ -6,6 +6,30 @@ The format is based on [Conventional Commits](https://www.conventionalcommits.or
 
 ---
 
+## [v1.0.1] - 08/07/2025
+
+### Changed
+- Migrating to cpp from python (idk why)
+
+### Added
+- Basic GUI with Qt: load video, set time range, and output
+- FFmpeg frame extraction using hardcoded options
+- Support for PNG output format
+- Basic layout and functional frame export
+- Automatically creates output directory if it doesn’t exist
+- Improved FFmpeg error reporting with `QPlainTextEdit`
+- Switched to **Dark Mode** using custom Qt palette
+- Organized layout using `QGroupBox` sections
+- Redesigned buttons and UI for a modern feel
+- Added hover effects for all buttons
+- Fixed bug where long error logs would overflow the window
+- Made window **frameless** with rounded corners using `QPainter`
+- Added **custom close button**
+- Added CMake build support for Linux/macOS/Windows
+- Provided working **AppImage** export for Linux
+- Verified FFmpeg installation automatically on startup
+- Integrated build badge and GitHub Actions CI
+
 ## [v1.0.0] - 06/07/2025
 
 ### Features

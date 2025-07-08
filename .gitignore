@@ -1,4 +1,31 @@
-dist
-build
+# Qt/CMake
+build/
+*.user
+*.pro.user
+*.pro.user.*
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
 
-fe.spec
+# Qt Creator QML cache
+.qtc_clangd/
+.idea/
+*.autosave
+
+# Artifacts
+release/
+*.AppImage
+*.deb
+*.exe
+*.dmg
+*.o
+*.obj
+*.log
+*.vcxproj*
+*.xcodeproj/
+*.DS_Store
+*.bak
+
+# GitHub Actions
+artifacts/

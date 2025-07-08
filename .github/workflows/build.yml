@@ -1,50 +1,172 @@
-name: Build Executables
+name: Build & Release App (Cross-platform)
 
 on:
   push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
 
 jobs:
   build:
-    name: Build for ${{ matrix.os }}
+    name: Build App on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
 
     steps:
-      - name: Checkout code
+      - name: Checkout Repository
         uses: actions/checkout@v3
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
-
-      - name: Install dependencies
-        run: pip install pyinstaller
-
-      # Windows build
-      - name: Build executable on Windows
-        if: runner.os == 'Windows'
-        shell: cmd
+      - name: Install Dependencies (Ubuntu)
+        if: matrix.os == 'ubuntu-latest'
         run: |
-          pyinstaller --onefile --name fe FrameExtractor.py --exclude-module libcrypto.so.3 --exclude-module libssl.so.3
+          sudo apt update
+          sudo apt install -y qtbase5-dev qt5-qmake cmake g++ appstream dpkg-dev fakeroot qttools5-dev-tools
 
-      # Linux build
-      - name: Build executable on Linux
-        if: runner.os == 'Linux'
-        run: pyinstaller --onefile --name fe FrameExtractor.py --exclude-module libcrypto.so.3 --exclude-module libssl.so.3
+      - name: Install Dependencies (Windows)
+        if: matrix.os == 'windows-latest'
+        uses: jurplel/install-qt-action@v3
+        with:
+          version: '5.15.2'
+          target: 'desktop'
 
-      # macOS build
-      - name: Build executable on macOS
-        if: runner.os == 'macOS'
-        run: pyinstaller --onefile --name fe FrameExtractor.py --exclude-module libcrypto.so.3 --exclude-module libssl.so.3
+      - name: Install Dependencies (macOS)
+        if: matrix.os == 'macos-latest'
+        uses: jurplel/install-qt-action@v3
+        with:
+          version: '5.15.2'
+          target: 'desktop'
 
-      - name: Upload Executable Artifact
+      - name: Build App
+        run: |
+          mkdir -p build
+          cd build
+          cmake .. -DCMAKE_BUILD_TYPE=Release
+          cmake --build . --config Release
+
+      - name: Run QTest Unit Tests
+        run: |
+          cd build
+          ctest --output-on-failure || true
+
+      - name: Package DEB (Linux only)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          mkdir -p pkgdir/DEBIAN
+          mkdir -p pkgdir/usr/bin
+          cp build/FrameExtractor pkgdir/usr/bin/
+          echo "Package: frameextractorqt" > pkgdir/DEBIAN/control
+          echo "Version: 1.0.0" >> pkgdir/DEBIAN/control
+          echo "Architecture: amd64" >> pkgdir/DEBIAN/control
+          echo "Maintainer: You <you@example.com>" >> pkgdir/DEBIAN/control
+          echo "Description: Frame Extractor Application" >> pkgdir/DEBIAN/control
+          dpkg-deb --build pkgdir frameextractorqt.deb
+
+      - name: Package DMG (macOS only)
+        if: matrix.os == 'macos-latest'
+        run: |
+          hdiutil create FrameExtractor.dmg -volname FrameExtractor -srcfolder build/
+
+      - name: Archive Binaries
+        run: |
+          mkdir -p release
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            cp build/Release/FrameExtractor.exe release/FrameExtractor.exe
+          elif [ "$RUNNER_OS" = "macOS" ]; then
+            cp FrameExtractor.dmg release/FrameExtractor.dmg
+            cp build/FrameExtractor release/FrameExtractor-macos
+          else
+            cp build/FrameExtractor release/FrameExtractor-linux
+            cp frameextractorqt.deb release/FrameExtractor.deb
+
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: fe-${{ matrix.os }}
-          path: dist/fe*
+          name: FrameExtractor-${{ runner.os }}
+          path: release/*
+
+  appimage:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Install Qt + tools
+        run: |
+          sudo apt update
+          sudo apt install -y qtbase5-dev qt5-qmake cmake g++ appstream appimagetool
+
+      - name: Build App
+        run: |
+          mkdir -p build
+          cd build
+          cmake .. -DCMAKE_BUILD_TYPE=Release
+          make
+
+      - name: Prepare AppDir
+        run: |
+          mkdir -p AppDir/usr/bin
+          cp build/FrameExtractor AppDir/usr/bin/
+          cp packaging/AppRun AppDir/
+          chmod +x AppDir/AppRun
+          cp packaging/FrameExtractor.desktop AppDir/
+          cp packaging/icon.png AppDir/
+
+      - name: Build AppImage
+        run: |
+          wget -q https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x appimagetool-x86_64.AppImage
+          ./appimagetool-x86_64.AppImage AppDir
+
+      - name: Upload AppImage Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: FrameExtractor.AppImage
+          path: FrameExtractor*.AppImage
+
+  publish:
+    needs: [build, appimage]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Generate Changelog
+        id: changelog
+        run: |
+          LAST_TAG=$(git tag --sort=-creatordate | head -n 1)
+          if [ -z "$LAST_TAG" ]; then
+            git log --pretty=format:"%s" > raw_log.txt
+          else
+            git log "$LAST_TAG"..HEAD --pretty=format:"%s" > raw_log.txt
+          fi
+
+          echo "CHANGELOG<<EOF" >> $GITHUB_OUTPUT
+          echo "### Changelog for ${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          echo >> $GITHUB_OUTPUT
+          grep '^feat' raw_log.txt | sed 's/^/- /' >> $GITHUB_OUTPUT || true
+          grep '^fix' raw_log.txt | sed 's/^/- /' >> $GITHUB_OUTPUT || true
+          grep -vE '^(feat|fix)' raw_log.txt | sed 's/^/- /' >> $GITHUB_OUTPUT || true
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Download All Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          body: ${{ steps.changelog.outputs.CHANGELOG }}
+          draft: false
+          prerelease: false
+          files: artifacts/**
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

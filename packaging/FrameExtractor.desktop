@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=Frame Extractor
+Exec=FrameExtractor
+Categories=Utility;
+Terminal=false
