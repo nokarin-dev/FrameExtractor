@@ -27,11 +27,11 @@ jobs:
                     target: 'desktop'
 
             -   name: Build App
-                    run: |
-                        mkdir -p build
-                        cd build
-                        cmake .. -DCMAKE_BUILD_TYPE=Release
-                        cmake --build . --config Release
+                run: |
+                    mkdir -p build
+                    cd build
+                    cmake .. -DCMAKE_BUILD_TYPE=Release
+                    cmake --build . --config Release
 
             -   name: Bundle Qt DLLs (Windows only)
                 if: matrix.os == 'windows-latest'
