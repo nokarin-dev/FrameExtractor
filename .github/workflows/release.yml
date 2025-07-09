@@ -43,7 +43,7 @@ jobs:
         if: matrix.os == 'windows-latest'
         shell: pwsh
         run: |
-          & "${env:Qt6_DIR}\bin\windeployqt.exe" "build\Release\FrameExtractor.exe"
+          & "${env:Qt6_DIR}\bin\windeployqt.exe" --release --compiler-runtime "build\Release\FrameExtractor.exe"
 
       - name: Bundle Qt (macOS)
         if: matrix.os == 'macos-latest'
@@ -55,11 +55,7 @@ jobs:
         shell: cmd
         run: |
           mkdir release
-          copy build\Release\FrameExtractor.exe release\FrameExtractor-windows-${{ matrix.arch }}.exe\
-          xcopy /E /Y build\Release\platforms release\platforms\
-          xcopy /E /Y build\Release\imageformats release\imageformats\
-          xcopy /E /Y build\Release\translations release\translations\
-          xcopy /E /Y build\Release\*.dll release\
+          copy build\Release\FrameExtractor.exe release\FrameExtractor-windows-${{ matrix.arch }}.exe
 
       - name: Package (macOS)
         if: runner.os == 'macOS'
