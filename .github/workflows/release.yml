@@ -55,7 +55,11 @@ jobs:
         shell: cmd
         run: |
           mkdir release
-          copy build\Release\FrameExtractor.exe release\FrameExtractor-windows-${{ matrix.arch }}.exe
+          copy build\Release\FrameExtractor.exe release\FrameExtractor-windows-${{ matrix.arch }}.exe\
+          xcopy /E /Y build\Release\platforms release\platforms\
+          xcopy /E /Y build\Release\imageformats release\imageformats\
+          xcopy /E /Y build\Release\translations release\translations\
+          xcopy /E /Y build\Release\*.dll release\
 
       - name: Package (macOS)
         if: runner.os == 'macOS'
