@@ -3,6 +3,7 @@
 #include <QFileInfo>
 #include <QDir>
 #include <QProcessEnvironment>
+#include <QtSystemDetection>
 
 QString findFFmpeg() {
     QString ffmpeg = QStandardPaths::findExecutable("ffmpeg");
@@ -15,7 +16,7 @@ QString findFFmpeg() {
         "C:/Program Files/ffmpeg/bin/ffmpeg.exe",
         "C:/Program Files (x86)/ffmpeg/bin/ffmpeg.exe"
     };
-#elif defined(Q_OS_MAC)
+#elif defined(Q_OS_MACOS)
     QStringList commonPaths = {
         "/usr/local/bin/ffmpeg",
         "/opt/homebrew/bin/ffmpeg"

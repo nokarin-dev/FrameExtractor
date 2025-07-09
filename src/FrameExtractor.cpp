@@ -17,6 +17,7 @@
 #include <QPainter>
 #include <QGraphicsDropShadowEffect>
 #include <QMouseEvent>
+#include <QtSystemDetection>
 
 #ifdef Q_OS_WIN
 #include <windows.h>
@@ -71,7 +72,7 @@ protected:
         #elif defined(Q_OS_LINUX)
         // KDE Wayland/X11 compositor blur hint
         setProperty("_KDE_NET_WM_BLUR_BEHIND_REGION", QRegion(rect()));
-        #elif defined(Q_OS_MAC)
+        #elif defined(Q_OS_MACOS)
         // Optional: macOS native blur may require Cocoa bridge (Objective-C)
         #endif
     }
