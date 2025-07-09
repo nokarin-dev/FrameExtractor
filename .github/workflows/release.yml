@@ -52,23 +52,23 @@ jobs:
 
       - name: Package (Windows)
         if: runner.os == 'Windows'
-        shell: pwsh
+        shell: cmd
         run: |
           mkdir release
-          Copy-Item build\Release\FrameExtractor.exe release\
+          copy build\Release\FrameExtractor.exe release\FrameExtractor-windows-${{ matrix.arch }}.exe
 
       - name: Package (macOS)
         if: runner.os == 'macOS'
         run: |
           mkdir -p release
           hdiutil create FrameExtractor.dmg -volname FrameExtractor -srcfolder build/
-          mv FrameExtractor.dmg release/
+          mv FrameExtractor.dmg release/FrameExtractor-macos-${{ matrix.arch }}.dmg
 
       - name: Package (Linux)
         if: runner.os == 'Linux'
         run: |
           mkdir -p release
-          cp build/FrameExtractor release/FrameExtractor-linux
+          cp build/FrameExtractor release/FrameExtractor-linux-${{ matrix.arch }}
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
