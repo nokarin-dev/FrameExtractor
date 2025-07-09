@@ -4,6 +4,7 @@ project(FrameExtractor VERSION 1.0 LANGUAGES CXX)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
+set(CMAKE_MACOSX_BUNDLE ON)
 set(CMAKE_CXX_STANDARD 17)
 
 # Find Qt (prefer Qt6, fallback to Qt5 if needed)
@@ -13,7 +14,7 @@ find_package(Qt6 REQUIRED COMPONENTS Widgets)
 qt_standard_project_setup()
 
 # Add main executable
-add_executable(FrameExtractor
+add_executable(FrameExtractor MACOSX_BUNDLE
 src/FrameExtractor.cpp
 src/utils/find_ffmpeg.cpp
 )

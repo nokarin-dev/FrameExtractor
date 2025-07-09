@@ -1,149 +1,155 @@
-name: Release & Package App
+name: Build & Release
 
 on:
-    push:
-        tags:
-            - 'v*'
+  push:
+    tags:
+      - "v*"
 
 permissions:
-    contents: write
+  contents: write
 
 jobs:
-    build:
-        name: Build App on ${{ matrix.os }}
-        runs-on: ${{ matrix.os }}
-        strategy:
-            matrix:
-                os: [ubuntu-latest, windows-latest, macos-latest]
+  build:
+    name: Build on ${{ matrix.os }}-${{ matrix.arch }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        arch: [x64, arm64]
+        exclude:
+          - os: windows-latest
+            arch: arm64 # unsupported
 
-        steps:
-            -   name: Checkout Repository
-                uses: actions/checkout@v3
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
 
-            -   name: Install Qt (Cross-platform)
-                uses: jurplel/install-qt-action@v3
-                with:
-                    version: '6.7.1'
-                    target: 'desktop'
+      - name: Set Up Qt
+        uses: jurplel/install-qt-action@v3
+        with:
+          version: "6.7.1"
+          target: desktop
 
-            -   name: Build App
-                run: |
-                    mkdir -p build
-                    cd build
-                    cmake .. -DCMAKE_BUILD_TYPE=Release
-                    cmake --build . --config Release
+      - name: Build
+        run: |
+          mkdir -p build && cd build
+          cmake .. -DCMAKE_BUILD_TYPE=Release
+          cmake --build . --config Release
 
-            -   name: Bundle Qt DLLs (Windows only)
-                if: matrix.os == 'windows-latest'
-                shell: cmd
-                run: |
-                    "${{ env.Qt6_DIR }}\bin\windeployqt.exe" build\Release\FrameExtractor.exe
+      - name: Run Tests
+        run: cd build && ctest --output-on-failure || true
 
-            -   name: macOS Bundle Qt (macdeployqt)
-                if: matrix.os == 'macos-latest'
-                run: |
-                    macdeployqt build/FrameExtractor.app
+      - name: Bundle Qt (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          & "${env:Qt6_DIR}\bin\windeployqt.exe" "build\Release\FrameExtractor.exe"
 
-            -   name: Package Artifacts
-                shell: bash
-                run: |
-                    mkdir -p release
-                    if [ "$RUNNER_OS" = "Windows" ]; then
-                        cp build/Release/FrameExtractor.exe release/
-                    elif [ "$RUNNER_OS" = "macOS" ]; then
-                        hdiutil create FrameExtractor.dmg -volname FrameExtractor -srcfolder build/
-                        cp FrameExtractor.dmg release/
-                    else
-                        cp build/FrameExtractor release/FrameExtractor-linux
-                    fi
+      - name: Bundle Qt (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          macdeployqt build/FrameExtractor.app
 
-            -   name: Upload Artifacts
-                uses: actions/upload-artifact@v4
-                with:
-                    name: FrameExtractor-${{ runner.os }}
-                    path: release/*
+      - name: Package
+        run: |
+          mkdir -p release
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            cp build/Release/FrameExtractor.exe release/
+          elif [[ "$RUNNER_OS" == "macOS" ]]; then
+            hdiutil create FrameExtractor.dmg -volname FrameExtractor -srcfolder build/
+            mv FrameExtractor.dmg release/
+          else
+            cp build/FrameExtractor release/FrameExtractor-linux
+          fi
 
-    appimage:
-        runs-on: ubuntu-latest
-        steps:
-            -   name: Checkout Repository
-                uses: actions/checkout@v3
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: FrameExtractor-${{ matrix.os }}-${{ matrix.arch }}
+          path: release/*
 
-            -   name: Install Qt
-                uses: jurplel/install-qt-action@v3
-                with:
-                    version: '6.7.1'
-                    target: 'desktop'
+  appimage:
+    name: Build AppImage
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
 
-            -   name: Install FUSE
-                run: sudo apt-get update && sudo apt-get install -y libfuse2
+      - name: Set Up Qt
+        uses: jurplel/install-qt-action@v3
+        with:
+          version: "6.7.1"
+          target: desktop
 
-            -   name: Build App
-                run: |
-                    mkdir -p build
-                    cd build
-                    cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="${Qt6_DIR}"
-                    cmake --build . --config Release
+      - name: Install FUSE
+        run: sudo apt-get update && sudo apt-get install -y libfuse2
 
-            -   name: Prepare AppDir
-                run: |
-                    mkdir -p AppDir/usr/bin
-                    cp build/FrameExtractor AppDir/usr/bin/
-                    cp packaging/AppRun AppDir/
-                    cp packaging/FrameExtractor.desktop AppDir/
-                    cp packaging/icon.png AppDir/
-                    chmod +x AppDir/AppRun
+      - name: Build App
+        run: |
+          mkdir -p build && cd build
+          cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="${Qt6_DIR}"
+          cmake --build . --config Release
 
-            -   name: Build AppImage
-                run: |
-                    wget -q https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
-                    chmod +x appimagetool-x86_64.AppImage
-                    ./appimagetool-x86_64.AppImage AppDir
-                    mv Frame_Extractor-*.AppImage FrameExtractor.AppImage
+      - name: Prepare AppDir
+        run: |
+          mkdir -p AppDir/usr/bin
+          cp build/FrameExtractor AppDir/usr/bin/
+          cp packaging/AppRun AppDir/
+          cp packaging/FrameExtractor.desktop AppDir/
+          cp packaging/icon.png AppDir/
+          chmod +x AppDir/AppRun
 
-            -   name: Upload AppImage
-                uses: actions/upload-artifact@v4
-                with:
-                    name: FrameExtractor.AppImage
-                    path: FrameExtractor.AppImage
+      - name: Build AppImage
+        run: |
+          wget -q https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x appimagetool-x86_64.AppImage
+          ./appimagetool-x86_64.AppImage AppDir
+          mv Frame_Extractor-*.AppImage FrameExtractor-x86_64.AppImage
 
-    publish:
-        needs: [build, appimage]
-        runs-on: ubuntu-latest
-        steps:
-            -   name: Checkout Code
-                uses: actions/checkout@v3
-                with:
-                    fetch-depth: 0
+      - name: Upload AppImage
+        uses: actions/upload-artifact@v4
+        with:
+          name: FrameExtractor.AppImage
+          path: FrameExtractor-x86_64.AppImage
 
-            -   name: Generate Changelog
-                id: changelog
-                run: |
-                    LAST_TAG=$(git tag --sort=-creatordate | head -n 2 | tail -n 1)
-                    if [ -z "$LAST_TAG" ]; then
-                        git log --pretty=format:"%s" > raw_log.txt
-                    else
-                        git log "$LAST_TAG"..HEAD --pretty=format:"%s" > raw_log.txt
-                    fi
-                    echo "CHANGELOG<<EOF" >> $GITHUB_OUTPUT
-                    echo "### Changelog for ${{ github.ref_name }}" >> $GITHUB_OUTPUT
-                    echo >> $GITHUB_OUTPUT
-                    grep '^feat' raw_log.txt | sed 's/^/- /' >> $GITHUB_OUTPUT || true
-                    grep '^fix' raw_log.txt | sed 's/^/- /' >> $GITHUB_OUTPUT || true
-                    grep -vE '^(feat|fix)' raw_log.txt | sed 's/^/- /' >> $GITHUB_OUTPUT || true
-                    echo "EOF" >> $GITHUB_OUTPUT
+  publish:
+    name: Create GitHub Release
+    needs: [build, appimage]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
 
-            -   name: Download Artifacts
-                uses: actions/download-artifact@v4
-                with:
-                    path: artifacts
+      - name: Generate Changelog
+        id: changelog
+        run: |
+          LAST_TAG=$(git tag --sort=-creatordate | head -n 2 | tail -n 1)
+          if [ -z "$LAST_TAG" ]; then
+            git log --pretty=format:"%s" > raw_log.txt
+          else
+            git log "$LAST_TAG"..HEAD --pretty=format:"%s" > raw_log.txt
+          fi
+          echo "CHANGELOG<<EOF" >> $GITHUB_OUTPUT
+          echo "### Changelog for ${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          echo >> $GITHUB_OUTPUT
+          grep '^feat' raw_log.txt | sed 's/^/- /' >> $GITHUB_OUTPUT || true
+          grep '^fix' raw_log.txt | sed 's/^/- /' >> $GITHUB_OUTPUT || true
+          grep -vE '^(feat|fix)' raw_log.txt | sed 's/^/- /' >> $GITHUB_OUTPUT || true
+          echo "EOF" >> $GITHUB_OUTPUT
 
-            -   name: Create GitHub Release
-                uses: softprops/action-gh-release@v2
-                with:
-                    tag_name: ${{ github.ref_name }}
-                    name: Release ${{ github.ref_name }}
-                    body: ${{ steps.changelog.outputs.CHANGELOG }}
-                    files: artifacts/**
-                env:
-                    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Publish Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          body: ${{ steps.changelog.outputs.CHANGELOG }}
+          files: artifacts/**
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

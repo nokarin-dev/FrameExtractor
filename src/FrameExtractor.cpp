@@ -27,9 +27,11 @@
 
 #include "utils/find_ffmpeg.h"
 
-class RoundedWindow : public QWidget {
+class RoundedWindow : public QWidget
+{
 public:
-    RoundedWindow() {
+    RoundedWindow()
+    {
         setWindowFlags(Qt::FramelessWindowHint | Qt::WindowSystemMenuHint);
         setAttribute(Qt::WA_TranslucentBackground);
         enableBlur();
@@ -38,30 +40,36 @@ public:
 protected:
     QPoint dragPos;
 
-    void mousePressEvent(QMouseEvent* event) override {
-        if (event->button() == Qt::LeftButton) {
+    void mousePressEvent(QMouseEvent *event) override
+    {
+        if (event->button() == Qt::LeftButton)
+        {
             dragPos = event->globalPosition().toPoint() - frameGeometry().topLeft();
             event->accept();
         }
     }
 
-    void mouseMoveEvent(QMouseEvent* event) override {
-        if (event->buttons() & Qt::LeftButton) {
+    void mouseMoveEvent(QMouseEvent *event) override
+    {
+        if (event->buttons() & Qt::LeftButton)
+        {
             move(event->globalPosition().toPoint() - dragPos);
             event->accept();
         }
     }
 
-    void paintEvent(QPaintEvent*) override {
+    void paintEvent(QPaintEvent *) override
+    {
         QPainter p(this);
         p.setRenderHint(QPainter::Antialiasing);
-        p.setBrush(QColor(30, 30, 30, 220));  // Semi-transparent
+        p.setBrush(QColor(30, 30, 30, 220)); // Semi-transparent
         p.setPen(Qt::NoPen);
         p.drawRoundedRect(rect(), 12, 12);
     }
 
-    void enableBlur() {
-        #ifdef Q_OS_WIN
+    void enableBlur()
+    {
+#ifdef Q_OS_WIN
         HWND hwnd = (HWND)winId();
 
         DWM_BLURBEHIND bb = {};
@@ -69,16 +77,17 @@ protected:
         bb.fEnable = true;
         bb.hRgnBlur = nullptr;
         DwmEnableBlurBehindWindow(hwnd, &bb);
-        #elif defined(Q_OS_LINUX)
+#elif defined(Q_OS_LINUX)
         // KDE Wayland/X11 compositor blur hint
         setProperty("_KDE_NET_WM_BLUR_BEHIND_REGION", QRegion(rect()));
-        #elif defined(Q_OS_MACOS)
-        // Optional: macOS native blur may require Cocoa bridge (Objective-C)
-        #endif
+#elif defined(Q_OS_MACOS)
+// Optional: macOS native blur may require Cocoa bridge (Objective-C)
+#endif
     }
 };
 
-int main(int argc, char *argv[]) {
+int main(int argc, char *argv[])
+{
     QApplication app(argc, argv);
     QApplication::setStyle(QStyleFactory::create("Fusion"));
 
@@ -99,7 +108,8 @@ int main(int argc, char *argv[]) {
     app.setPalette(darkPalette);
 
     QString ffmpegPath = findFFmpeg();
-    if (ffmpegPath.isEmpty()) {
+    if (ffmpegPath.isEmpty())
+    {
         qCritical() << "❌ FFmpeg not found. Make sure it is installed and in your PATH.";
         return -1;
     }
@@ -111,7 +121,7 @@ int main(int argc, char *argv[]) {
     QVBoxLayout *layout = new QVBoxLayout(&window);
     layout->setContentsMargins(16, 16, 16, 16);
 
-    QPushButton* closeBtn = new QPushButton("✖");
+    QPushButton *closeBtn = new QPushButton("✖");
     closeBtn->setFixedSize(30, 30);
     closeBtn->setStyleSheet("QPushButton { background-color: #aa0000; color: white; border: none; border-radius: 15px; } QPushButton:hover { background-color: red; }");
     QObject::connect(closeBtn, &QPushButton::clicked, &window, &QWidget::close);
@@ -163,12 +173,13 @@ int main(int argc, char *argv[]) {
     layout->addWidget(settingsGroup);
     layout->addWidget(extractBtn);
 
-    QObject::connect(browseBtn, &QPushButton::clicked, [&]() {
+    QObject::connect(browseBtn, &QPushButton::clicked, [&]()
+                     {
         QString fileName = QFileDialog::getOpenFileName(&window, "Select Video File");
-        if (!fileName.isEmpty()) videoPathEdit->setText(fileName);
-    });
+        if (!fileName.isEmpty()) videoPathEdit->setText(fileName); });
 
-    QObject::connect(extractBtn, &QPushButton::clicked, [&]() {
+    QObject::connect(extractBtn, &QPushButton::clicked, [&]()
+                     {
         QString videoPath = videoPathEdit->text();
         QString startTime = startTimeEdit->text();
         QString endTime = endTimeEdit->text();
@@ -233,8 +244,7 @@ int main(int argc, char *argv[]) {
             dialogLayout->addWidget(closeBtn);
 
             errorDialog->exec();
-        }
-    });
+        } });
 
     window.show();
     return app.exec();

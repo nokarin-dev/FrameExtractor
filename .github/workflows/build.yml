@@ -1,18 +1,21 @@
-name: Build
+name: Build CI
 
 on:
   push:
     branches:
       - main
-    pull_request:
 
 jobs:
   build:
-    name: Build App on ${{ matrix.os }}
+    name: Build App on ${{ matrix.os }} - ${{ matrix.arch }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
+        arch: [x64, arm64]
+        exclude:
+          - os: windows-latest
+            arch: arm64 # unsupported
 
     steps:
       - name: Checkout Repository
@@ -21,14 +24,18 @@ jobs:
       - name: Install Qt (Cross-platform)
         uses: jurplel/install-qt-action@v3
         with:
-          version: '6.7.1'
-          target: 'desktop'
+          version: "6.7.1"
+          target: "desktop"
+
+      - name: Set CMake Architecture Flags (macOS only)
+        if: matrix.os == 'macos-latest'
+        run: echo "CMAKE_OSX_ARCHITECTURES=${{ matrix.arch }}" >> $GITHUB_ENV
 
       - name: Build App
         run: |
           mkdir -p build
           cd build
-          cmake .. -DCMAKE_BUILD_TYPE=Release
+          cmake .. -DCMAKE_BUILD_TYPE=Release ${CMAKE_OSX_ARCHITECTURES:+-DCMAKE_OSX_ARCHITECTURES=$CMAKE_OSX_ARCHITECTURES}
           cmake --build . --config Release
 
       - name: Run QTest Unit Tests
