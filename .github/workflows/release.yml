@@ -35,6 +35,7 @@ jobs:
 
             -   name: Bundle Qt DLLs (Windows only)
                 if: matrix.os == 'windows-latest'
+                shell: cmd
                 run: |
                     "${{ env.Qt6_DIR }}\bin\windeployqt.exe" build\Release\FrameExtractor.exe
 
