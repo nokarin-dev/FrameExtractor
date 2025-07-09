@@ -15,7 +15,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        arch: [x64, arm64]
+        arch: [x86_64, arm64]
         exclude:
           - os: windows-latest
             arch: arm64 # unsupported
@@ -50,17 +50,25 @@ jobs:
         run: |
           macdeployqt build/FrameExtractor.app
 
-      - name: Package
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          mkdir release
+          Copy-Item build\Release\FrameExtractor.exe release\
+
+      - name: Package (macOS)
+        if: runner.os == 'macOS'
         run: |
           mkdir -p release
-          if [[ "$RUNNER_OS" == "Windows" ]]; then
-            cp build/Release/FrameExtractor.exe release/
-          elif [[ "$RUNNER_OS" == "macOS" ]]; then
-            hdiutil create FrameExtractor.dmg -volname FrameExtractor -srcfolder build/
-            mv FrameExtractor.dmg release/
-          else
-            cp build/FrameExtractor release/FrameExtractor-linux
-          fi
+          hdiutil create FrameExtractor.dmg -volname FrameExtractor -srcfolder build/
+          mv FrameExtractor.dmg release/
+
+      - name: Package (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          mkdir -p release
+          cp build/FrameExtractor release/FrameExtractor-linux
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
