@@ -7,6 +7,10 @@ set(CMAKE_AUTOUIC ON)
 set(CMAKE_MACOSX_BUNDLE ON)
 set(CMAKE_CXX_STANDARD 17)
 
+if(WIN32)
+set(CMAKE_WIN32_EXECUTABLE ON)
+endif()
+
 # Find Qt (prefer Qt6, fallback to Qt5 if needed)
 find_package(Qt6 REQUIRED COMPONENTS Widgets)
 
