@@ -18,10 +18,15 @@ find_package(Qt6 REQUIRED COMPONENTS Widgets)
 qt_standard_project_setup()
 
 # Add main executable
-add_executable(FrameExtractor MACOSX_BUNDLE
+add_executable(FrameExtractor
 src/FrameExtractor.cpp
 src/utils/find_ffmpeg.cpp
 )
+
+# Apply subsystem GUI (Windows only)
+if(WIN32)
+set_target_properties(FrameExtractor PROPERTIES WIN32_EXECUTABLE TRUE)
+endif()
 
 # Link Qt libraries
 target_link_libraries(FrameExtractor
@@ -29,10 +34,10 @@ Qt6::Widgets
 )
 
 if (WIN32)
-    target_link_libraries(FrameExtractor dwmapi)
+target_link_libraries(FrameExtractor dwmapi)
 endif()
 
-# Optional: install target to AppDir structure
+# install target to AppDir structure
 install(TARGETS FrameExtractor DESTINATION usr/bin)
 install(FILES packaging/FrameExtractor.desktop DESTINATION .)
 install(FILES packaging/AppRun DESTINATION . PERMISSIONS OWNER_EXECUTE OWNER_WRITE OWNER_READ GROUP_EXECUTE GROUP_READ WORLD_EXECUTE WORLD_READ)

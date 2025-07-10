@@ -54,8 +54,8 @@ jobs:
         if: runner.os == 'Windows'
         shell: cmd
         run: |
-          mkdir release\windows
-          xcopy /E /Y build\Release\* release\windows\
+          mkdir release
+          xcopy /E /Y build\Release\* release\
 
       - name: Package (macOS)
         if: runner.os == 'macOS'
@@ -74,14 +74,14 @@ jobs:
         if: runner.os == 'Windows'
         shell: powershell
         run: |
-          Compress-Archive -Path release\windows -DestinationPath release\FrameExtractor-windows-${{ matrix.arch }}.zip
+          Compress-Archive -Path release -DestinationPath FrameExtractor-windows-${{ matrix.arch }}.zip
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: FrameExtractor-${{ matrix.os }}-${{ matrix.arch }}
           path: |
-            release/*
+            release/FrameExtractor-*
 
   appimage:
     name: Build AppImage
