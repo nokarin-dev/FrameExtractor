@@ -43,7 +43,7 @@ jobs:
         if: matrix.os == 'windows-latest'
         shell: pwsh
         run: |
-          & "${env:Qt6_DIR}\bin\windeployqt.exe" --verbose --release --compiler-runtime build\Release\FrameExtractor.exe
+          & "${env:Qt6_DIR}\bin\windeployqt.exe" --release --compiler-runtime --verbose=2 build\Release\FrameExtractor.exe
 
       - name: Bundle Qt (macOS)
         if: matrix.os == 'macos-latest'
