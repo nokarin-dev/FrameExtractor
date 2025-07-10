@@ -74,7 +74,7 @@ jobs:
         if: runner.os == 'Windows'
         shell: powershell
         run: |
-          Compress-Archive -Path release -DestinationPath FrameExtractor-windows-${{ matrix.arch }}.zip
+          Compress-Archive -Path release\* -DestinationPath release\FrameExtractor-windows-${{ matrix.arch }}.zip
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
