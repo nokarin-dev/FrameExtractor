@@ -17,7 +17,9 @@
 #include <QPainter>
 #include <QGraphicsDropShadowEffect>
 #include <QMouseEvent>
-#include <QtSystemDetection>
+#include <QProgressDialog>
+#include <QTimer>
+#include <QRegularExpression>
 
 #ifdef Q_OS_WIN
 #include <windows.h>
@@ -25,7 +27,9 @@
 #pragma comment(lib, "dwmapi.lib")
 #endif
 
-#include "utils/find_ffmpeg.h"
+#include "utils/GetVideoDuration.h"
+#include "utils/DownloadFFmpeg.h"
+#include "utils/FindFFmpeg.h"
 
 class RoundedWindow : public QWidget
 {
@@ -39,49 +43,32 @@ public:
 
 protected:
     QPoint dragPos;
-
     void mousePressEvent(QMouseEvent *event) override
     {
         if (event->button() == Qt::LeftButton)
-        {
             dragPos = event->globalPosition().toPoint() - frameGeometry().topLeft();
-            event->accept();
-        }
     }
-
     void mouseMoveEvent(QMouseEvent *event) override
     {
         if (event->buttons() & Qt::LeftButton)
-        {
             move(event->globalPosition().toPoint() - dragPos);
-            event->accept();
-        }
     }
-
     void paintEvent(QPaintEvent *) override
     {
         QPainter p(this);
         p.setRenderHint(QPainter::Antialiasing);
-        p.setBrush(QColor(30, 30, 30, 220)); // Semi-transparent
+        p.setBrush(QColor(30, 30, 30, 230));
         p.setPen(Qt::NoPen);
         p.drawRoundedRect(rect(), 12, 12);
     }
-
     void enableBlur()
     {
 #ifdef Q_OS_WIN
         HWND hwnd = (HWND)winId();
-
         DWM_BLURBEHIND bb = {};
         bb.dwFlags = DWM_BB_ENABLE;
         bb.fEnable = true;
-        bb.hRgnBlur = nullptr;
         DwmEnableBlurBehindWindow(hwnd, &bb);
-#elif defined(Q_OS_LINUX)
-        // KDE Wayland/X11 compositor blur hint
-        setProperty("_KDE_NET_WM_BLUR_BEHIND_REGION", QRegion(rect()));
-#elif defined(Q_OS_MACOS)
-// Optional: macOS native blur may require Cocoa bridge (Objective-C)
 #endif
     }
 };
@@ -91,116 +78,140 @@ int main(int argc, char *argv[])
     QApplication app(argc, argv);
     QApplication::setStyle(QStyleFactory::create("Fusion"));
 
-    QPalette darkPalette;
-    darkPalette.setColor(QPalette::Window, QColor(30, 30, 30));
-    darkPalette.setColor(QPalette::WindowText, Qt::white);
-    darkPalette.setColor(QPalette::Base, QColor(25, 25, 25));
-    darkPalette.setColor(QPalette::AlternateBase, QColor(53, 53, 53));
-    darkPalette.setColor(QPalette::ToolTipBase, Qt::white);
-    darkPalette.setColor(QPalette::ToolTipText, Qt::white);
-    darkPalette.setColor(QPalette::Text, Qt::white);
-    darkPalette.setColor(QPalette::Button, QColor(50, 50, 50));
-    darkPalette.setColor(QPalette::ButtonText, Qt::white);
-    darkPalette.setColor(QPalette::BrightText, Qt::red);
-    darkPalette.setColor(QPalette::Link, QColor(42, 130, 218));
-    darkPalette.setColor(QPalette::Highlight, QColor(42, 130, 218));
-    darkPalette.setColor(QPalette::HighlightedText, Qt::black);
-    app.setPalette(darkPalette);
+    QPalette palette;
+    palette.setColor(QPalette::Window, QColor(30, 30, 30));
+    palette.setColor(QPalette::WindowText, Qt::white);
+    palette.setColor(QPalette::Base, QColor(45, 45, 45));
+    palette.setColor(QPalette::Text, Qt::white);
+    palette.setColor(QPalette::Button, QColor(70, 70, 70));
+    palette.setColor(QPalette::ButtonText, Qt::white);
+    palette.setColor(QPalette::Highlight, QColor(42, 130, 218));
+    palette.setColor(QPalette::HighlightedText, Qt::black);
+    app.setPalette(palette);
 
     QString ffmpegPath = findFFmpeg();
     if (ffmpegPath.isEmpty())
     {
-        qCritical() << "❌ FFmpeg not found. Make sure it is installed and in your PATH.";
-        return -1;
+        QMessageBox msgBox;
+        msgBox.setWindowTitle("FFmpeg Not Found");
+        msgBox.setText("❌ FFmpeg not found. Install now?");
+        QPushButton *installBtn = msgBox.addButton("Install", QMessageBox::AcceptRole);
+        msgBox.addButton(QMessageBox::Cancel);
+        msgBox.exec();
+        if (msgBox.clickedButton() == installBtn)
+        {
+            ffmpegPath = installFFmpeg(nullptr);
+            if (ffmpegPath.isEmpty())
+                return -1;
+        }
+        else
+            return -1;
     }
 
     RoundedWindow window;
     window.setWindowTitle("Frame Extractor");
-    window.resize(640, 480);
+    window.resize(540, 460);
 
     QVBoxLayout *layout = new QVBoxLayout(&window);
-    layout->setContentsMargins(16, 16, 16, 16);
+    layout->setContentsMargins(16, 16, 10, 10);
+    layout->setSpacing(8);
 
+    QHBoxLayout *closeLayout = new QHBoxLayout();
     QPushButton *closeBtn = new QPushButton("✖");
     closeBtn->setFixedSize(30, 30);
     closeBtn->setStyleSheet("QPushButton { background-color: #aa0000; color: white; border: none; border-radius: 15px; } QPushButton:hover { background-color: red; }");
     QObject::connect(closeBtn, &QPushButton::clicked, &window, &QWidget::close);
-    layout->addWidget(closeBtn, 0, Qt::AlignRight);
+    closeLayout->addWidget(new QLabel("Frame Extractor"));
+    closeLayout->addWidget(closeBtn, 0, Qt::AlignRight);
 
-    QGroupBox *inputGroup = new QGroupBox("🎬 Video Input");
-    QVBoxLayout *inputLayout = new QVBoxLayout(inputGroup);
     QHBoxLayout *videoLayout = new QHBoxLayout();
     QLineEdit *videoPathEdit = new QLineEdit();
-    QPushButton *browseBtn = new QPushButton("Browse...");
+    QPushButton *browseVideoBtn = new QPushButton("Browse");
+    videoLayout->addWidget(new QLabel("🎬 Input Video:"));
     videoLayout->addWidget(videoPathEdit);
-    videoLayout->addWidget(browseBtn);
-    inputLayout->addLayout(videoLayout);
+    videoLayout->addWidget(browseVideoBtn);
 
-    QGroupBox *timeGroup = new QGroupBox("⏱️ Time Range");
-    QVBoxLayout *timeLayout = new QVBoxLayout(timeGroup);
+    QHBoxLayout *outputLayout = new QHBoxLayout();
+    QLineEdit *outputDirEdit = new QLineEdit();
+    QPushButton *browseOutputBtn = new QPushButton("Browse");
+    outputLayout->addWidget(new QLabel("📂 Output Dir:"));
+    outputLayout->addWidget(outputDirEdit);
+    outputLayout->addWidget(browseOutputBtn);
+
+    QHBoxLayout *timeLayout = new QHBoxLayout();
     QLineEdit *startTimeEdit = new QLineEdit("00:00:00");
     QLineEdit *endTimeEdit = new QLineEdit("00:00:05");
-    timeLayout->addWidget(new QLabel("Start Time (HH:MM:SS):"));
+    timeLayout->addWidget(new QLabel("Start:"));
     timeLayout->addWidget(startTimeEdit);
-    timeLayout->addWidget(new QLabel("End Time (HH:MM:SS):"));
+    timeLayout->addSpacing(10);
+    timeLayout->addWidget(new QLabel("End:"));
     timeLayout->addWidget(endTimeEdit);
 
-    QGroupBox *settingsGroup = new QGroupBox("⚙️ Settings");
-    QVBoxLayout *settingsLayout = new QVBoxLayout(settingsGroup);
-
+    QHBoxLayout *settingsLayout = new QHBoxLayout();
     QLineEdit *fpsEdit = new QLineEdit("10");
-    settingsLayout->addWidget(new QLabel("FPS:"));
-    settingsLayout->addWidget(fpsEdit);
-
     QLineEdit *frameNameEdit = new QLineEdit("frame");
-    settingsLayout->addWidget(new QLabel("Frame Name Prefix:"));
-    settingsLayout->addWidget(frameNameEdit);
-
     QComboBox *formatCombo = new QComboBox();
     formatCombo->addItems({"png", "jpg", "jpeg"});
-    settingsLayout->addWidget(new QLabel("Image Format:"));
+    settingsLayout->addWidget(new QLabel("FPS:"));
+    settingsLayout->addWidget(fpsEdit);
+    settingsLayout->addWidget(new QLabel("Name:"));
+    settingsLayout->addWidget(frameNameEdit);
+    settingsLayout->addWidget(new QLabel("Format:"));
     settingsLayout->addWidget(formatCombo);
-
-    QLineEdit *outputDirEdit = new QLineEdit();
-    settingsLayout->addWidget(new QLabel("Output Directory:"));
-    settingsLayout->addWidget(outputDirEdit);
 
     QPushButton *extractBtn = new QPushButton("Extract Frames");
     extractBtn->setMinimumHeight(40);
 
-    layout->addWidget(inputGroup);
-    layout->addWidget(timeGroup);
-    layout->addWidget(settingsGroup);
+    layout->addLayout(closeLayout);
+    layout->addLayout(videoLayout);
+    layout->addLayout(outputLayout);
+    layout->addLayout(timeLayout);
+    layout->addLayout(settingsLayout);
     layout->addWidget(extractBtn);
 
-    QObject::connect(browseBtn, &QPushButton::clicked, [&]()
+    QObject::connect(browseVideoBtn, &QPushButton::clicked, [&]()
                      {
-        QString fileName = QFileDialog::getOpenFileName(&window, "Select Video File");
-        if (!fileName.isEmpty()) videoPathEdit->setText(fileName); });
+        QString path = QFileDialog::getOpenFileName(&window, "Select Video File");
+        if (!path.isEmpty()) {
+            videoPathEdit->setText(path);
+            QString duration = getVideoDuration(ffmpegPath, path);
+            if (!duration.isEmpty()) endTimeEdit->setText(duration);
+        } });
+
+    QObject::connect(videoPathEdit, &QLineEdit::textChanged, [&](const QString &text)
+                     {
+        if (text.endsWith("/") || QFile::exists(text)) {
+            QString duration = getVideoDuration(ffmpegPath, text);
+            if (!duration.isEmpty()) endTimeEdit->setText(duration);
+        } });
+
+    QObject::connect(browseOutputBtn, &QPushButton::clicked, [&]()
+                     {
+        QString path = QFileDialog::getExistingDirectory(&window, "Select Output Directory");
+        if (!path.isEmpty()) outputDirEdit->setText(path); });
 
     QObject::connect(extractBtn, &QPushButton::clicked, [&]()
                      {
         QString videoPath = videoPathEdit->text();
+        QString outputDir = outputDirEdit->text();
         QString startTime = startTimeEdit->text();
         QString endTime = endTimeEdit->text();
         QString fps = fpsEdit->text();
-        QString outputDir = outputDirEdit->text();
         QString prefix = frameNameEdit->text();
-        QString format = formatCombo->currentText().trimmed().toLower();
-
-        if (!(format == "png" || format == "jpg" || format == "jpeg")) {
-            QMessageBox::warning(&window, "Invalid Format", "Supported formats are: png, jpg, jpeg.");
-            return;
-        }
+        QString format = formatCombo->currentText();
 
         if (videoPath.isEmpty() || outputDir.isEmpty() || prefix.isEmpty()) {
-            QMessageBox::warning(&window, "Input Error", "Please fill in all fields.");
+            QMessageBox::warning(&window, "Missing Fields", "Please fill in all fields.");
             return;
         }
-
+        
         QDir().mkpath(outputDir);
-        QString outputPattern = QString("%1/%2%d.%3").arg(outputDir, prefix, format);
+        QProgressDialog progress("Extracting frames...", QString(), 0, 0, &window);
+        progress.setWindowModality(Qt::WindowModal);
+        progress.setCancelButton(nullptr);
+        progress.show();
 
+        QString outputPattern = QString("%1/%2%%d.%3").arg(outputDir, prefix, format);
         QStringList args = {
             "-ss", startTime,
             "-to", endTime,
@@ -212,36 +223,40 @@ int main(int argc, char *argv[])
 
         QProcess process;
         process.start(ffmpegPath, args);
-
         if (!process.waitForStarted()) {
-            QMessageBox::critical(&window, "Error", "Failed to start FFmpeg.");
+            QMessageBox::critical(&window, "FFmpeg Error", "Failed to start FFmpeg.");
             return;
         }
 
         process.waitForFinished(-1);
-        QString stdErr = process.readAllStandardError();
+        progress.close();
 
         if (process.exitStatus() == QProcess::NormalExit && process.exitCode() == 0) {
-            QMessageBox::information(&window, "Success", "Frames extracted successfully.");
+            QMessageBox::information(&window, "Done", "Frames extracted successfully.");
         } else {
-            QString errMsg = QString("Failed to extract frames.\nExit Code: %1\nError:\n%2").arg(process.exitCode()).arg(stdErr);
-
-            QDialog* errorDialog = new QDialog(&window);
+            QString errMsg = process.readAllStandardError();
+            QDialog *errorDialog = new QDialog(&window);
             errorDialog->setWindowTitle("FFmpeg Error");
-            errorDialog->resize(600, 400);
+            errorDialog->setModal(true);
 
-            QVBoxLayout* dialogLayout = new QVBoxLayout(errorDialog);
-            QLabel* label = new QLabel("Failed to extract frames. Here's the log:");
-            dialogLayout->addWidget(label);
+            QVBoxLayout *dialogLayout = new QVBoxLayout(errorDialog);
+            dialogLayout->addWidget(new QLabel("Failed to extract frames. Here's the log:"));
 
-            QPlainTextEdit* logBox = new QPlainTextEdit();
+            QPlainTextEdit *logBox = new QPlainTextEdit();
             logBox->setReadOnly(true);
             logBox->setPlainText(errMsg);
+            logBox->setWordWrapMode(QTextOption::NoWrap);
             dialogLayout->addWidget(logBox);
 
-            QPushButton* closeBtn = new QPushButton("Close");
+            QPushButton *closeBtn = new QPushButton("Close");
             QObject::connect(closeBtn, &QPushButton::clicked, errorDialog, &QDialog::accept);
             dialogLayout->addWidget(closeBtn);
+
+            errorDialog->adjustSize();
+            QRect parentGeom = window.geometry();
+            int x = parentGeom.x() + (parentGeom.width() - errorDialog->width()) / 2;
+            int y = parentGeom.y() + (parentGeom.height() - errorDialog->height()) / 2;
+            errorDialog->move(x, y);
 
             errorDialog->exec();
         } });

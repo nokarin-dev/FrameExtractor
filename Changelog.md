@@ -4,10 +4,27 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) and this project adheres to [Semantic Versioning](https://semver.org/).
 
+
+---
+
+## [v1.0.4] - 13/07/2025
+### Features
+- Input video and output directory fields are now side-by-side with "Browse" buttons.
+- Automatically detects video duration and sets the "End Time" using `ffprobe`.
+- Added a progress dialog while extracting frames to improve user feedback.
+
+### Fixes
+- Time fields, directory fields, and settings are now horizontally aligned for better UX.
+- FFmpeg error dialog no longer renders off-screen; now centered and resizable.
+
+### Enhancements
+- Auto-installs FFmpeg if not found, with confirmation dialog.
+- Overall UX improvements for smoother navigation and frame extraction process.
+- FFmpeg error logs are shown in a scrollable, modal dialog for better debugging.
+
 ---
 
 ## [v1.0.1] - 08/07/2025
-
 ### Changed
 - Migrating to cpp from python (idk why)
 
@@ -31,7 +48,6 @@ The format is based on [Conventional Commits](https://www.conventionalcommits.or
 - Integrated build badge and GitHub Actions CI
 
 ## [v1.0.0] - 06/07/2025
-
 ### Features
 - Add support for extracting frames from specific time ranges
 - Allow user-defined frame output prefix and format

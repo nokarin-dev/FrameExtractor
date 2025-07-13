@@ -1,4 +1,4 @@
-#include "find_ffmpeg.h"
+#include "FindFFmpeg.h"
 #include <QStandardPaths>
 #include <QFileInfo>
 #include <QDir>

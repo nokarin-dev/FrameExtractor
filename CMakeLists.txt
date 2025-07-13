@@ -13,6 +13,7 @@ endif()
 
 # Find Qt (prefer Qt6, fallback to Qt5 if needed)
 find_package(Qt6 REQUIRED COMPONENTS Widgets)
+find_package(Qt6 REQUIRED COMPONENTS Network)
 
 # Set up Qt environment
 qt_standard_project_setup()
@@ -20,7 +21,10 @@ qt_standard_project_setup()
 # Add main executable
 add_executable(FrameExtractor
 src/FrameExtractor.cpp
-src/utils/find_ffmpeg.cpp
+src/utils/FindFFmpeg.cpp
+src/utils/DownloadFFmpeg.cpp
+src/utils/DownloadDialog.cpp
+src/utils/GetVideoDuration.cpp
 )
 
 # Apply subsystem GUI (Windows only)
@@ -31,6 +35,7 @@ endif()
 # Link Qt libraries
 target_link_libraries(FrameExtractor
 Qt6::Widgets
+Qt6::Network
 )
 
 if (WIN32)
