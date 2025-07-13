@@ -211,7 +211,7 @@ int main(int argc, char *argv[])
         progress.setCancelButton(nullptr);
         progress.show();
 
-        QString outputPattern = QString("%1/%2%%d.%3").arg(outputDir, prefix, format);
+        QString outputPattern = QString("%1/%2%d.%3").arg(outputDir, prefix, format);
         QStringList args = {
             "-ss", startTime,
             "-to", endTime,
