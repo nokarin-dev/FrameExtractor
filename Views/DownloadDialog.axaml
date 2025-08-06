@@ -1,0 +1,44 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="FrameExtractor.Views.DownloadDialog"
+        Title="Downloading FFmpeg"
+        Width="400" Height="120"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaChromeHints="NoChrome">
+
+    <Border CornerRadius="8" ClipToBounds="True">
+        <Grid RowDefinitions="Auto,*,Auto">
+            <!-- Title Bar -->
+            <Grid Grid.Row="0" Height="30" Background="Transparent">
+                <TextBlock Text="Downloading FFmpeg" 
+                           VerticalAlignment="Center" 
+                           HorizontalAlignment="Center"
+                           FontWeight="SemiBold"
+                           Foreground="White"
+                           FontSize="14"/>
+            </Grid>
+
+            <!-- Content -->
+            <StackPanel Grid.Row="1" Spacing="15" Margin="20">
+                
+                <TextBlock x:Name="StatusLabel"
+                           Text="Initializing..."
+                           Foreground="White"
+                           HorizontalAlignment="Center"
+                           FontSize="12"/>
+                
+                <ProgressBar x:Name="ProgressBar"
+                             Height="8"
+                             Minimum="0"
+                             Maximum="100"
+                             Value="0"/>
+                             
+            </StackPanel>
+            
+            <!-- Bottom spacing -->
+            <Border Grid.Row="2" Height="10"/>
+        </Grid>
+    </Border>
+</Window>

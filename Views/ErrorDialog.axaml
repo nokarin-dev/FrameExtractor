@@ -1,0 +1,68 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="FrameExtractor.Views.ErrorDialog"
+        Title="FFmpeg Error"
+        Width="600" Height="400"
+        WindowStartupLocation="CenterOwner"
+        CanResize="True"
+        MinWidth="500"
+        MinHeight="300"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaChromeHints="NoChrome">
+
+    <Border CornerRadius="8" ClipToBounds="True">
+        <Grid RowDefinitions="Auto,*,Auto">
+            <!-- Title Bar -->
+            <Grid Grid.Row="0" Height="40" Background="Transparent">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                
+                <TextBlock Grid.Column="0"
+                           Text="FFmpeg Error" 
+                           VerticalAlignment="Center" 
+                           Margin="16,0,0,0"
+                           FontWeight="SemiBold"
+                           Foreground="White"
+                           FontSize="14"/>
+                           
+                <Button Grid.Column="1"
+                        Width="25" Height="25" 
+                        Margin="0,7,10,7"
+                        Content="✖"
+                        FontSize="10"
+                        Click="CloseButton_Click"/>
+            </Grid>
+
+            <!-- Content -->
+            <StackPanel Grid.Row="1" Spacing="10" Margin="20,0,20,20">
+                
+                <TextBlock Text="Failed to extract frames. Here's the log:"
+                           Foreground="White"
+                           FontWeight="SemiBold"
+                           Margin="0,0,0,10"/>
+                
+                <ScrollViewer Height="280" 
+                              CornerRadius="4"
+                              Padding="10">
+                    <TextBlock x:Name="LogTextBlock"
+                               Text=""
+                               Foreground="White"
+                               FontFamily="Consolas,monospace"
+                               FontSize="11"
+                               TextWrapping="Wrap"/>
+                </ScrollViewer>
+                
+            </StackPanel>
+            
+            <!-- Bottom Button -->
+            <Border Grid.Row="2" Padding="20,0,20,20">
+                <Button Content="Close"
+                        HorizontalAlignment="Right"
+                        Padding="20,8"
+                        Click="CloseButton_Click"/>
+            </Border>
+        </Grid>
+    </Border>
+</Window>
