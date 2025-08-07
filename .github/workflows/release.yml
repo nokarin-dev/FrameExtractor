@@ -36,7 +36,7 @@ jobs:
           dotnet publish FrameExtractor.csproj \
             -c Release \
             -r ${{ matrix.rid }} \
-            --self-contained true \
+            -p:SelfContained=true \
             -p:PublishSingleFile=true \
             -p:IncludeNativeLibrariesForSelfExtract=true \
             -p:PublishTrimmed=true \
