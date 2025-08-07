@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) and this project adheres to [Semantic Versioning](https://semver.org/).
 
+---
+
+## [v1.0.5] - 07/08/2025
+
+First public release of **FrameExtractor (Avalonia Edition)**
+
+### Added
+- Brand-new UI built with **Avalonia UI** for cross-platform support
+- FFmpeg integration with automatic detection and fallback installation
+- Frame extraction between **Start Time** and **End Time** (`HH:MM:SS`)
+- FPS setting with custom frame rate (e.g. 5, 10, 24, 60)
+- Support for PNG, JPG, and JPEG output formats
+- Output directory and frame name prefix customization
+- Real-time status feedback with progress indicator
+- Works on **Windows** and **Linux** (macOS support coming soon)
+- Publish-ready standalone builds via `.NET 8`
+- New fresh GUI
 
 ---
 

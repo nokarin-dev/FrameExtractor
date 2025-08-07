@@ -1,9 +1,0 @@
-{
-    "C_Cpp.errorSquiggles": "enabled",
-    "files.associations": {
-        "qplaintextedit": "cpp",
-        "qtsystemdetection": "cpp",
-        "qurl": "cpp",
-        "qnetworkrequest": "cpp"
-    }
-}

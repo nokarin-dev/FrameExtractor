@@ -1,0 +1,210 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:vm="using:FrameExtractor.ViewModels"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="760" d:DesignHeight="500"
+        x:Class="FrameExtractor.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Title="FrameExtractor"
+        Width="760"
+        Height="500"
+        TransparencyLevelHint="AcrylicBlur,Blur,Transparent"
+        WindowStartupLocation="CenterScreen"
+        CanResize="False"
+        Background="Transparent">
+    
+    <!-- Main Content with Rounded Corners -->
+    <Border CornerRadius="16"
+            ClipToBounds="True"
+            Background="Black">
+        <Grid RowDefinitions="Auto, *, Auto">
+            <!-- Custom Title Bar -->
+            <Grid Grid.Row="0"
+                  Background="Transparent"
+                  IsHitTestVisible="True"
+                  Margin="15, 10, 15, 20"
+                  ColumnDefinitions="*, Auto">
+                
+                <!-- Title and Drag Area -->
+                <TextBlock Grid.Column="0"
+                           Text="Frame Extractor"
+                           VerticalAlignment="Center"
+                           FontWeight="SemiBold"
+                           Foreground="White"
+                           IsHitTestVisible="False"/>
+                
+                <!-- Close Button -->
+                <Button Grid.Column="1"
+                        Width="30" Height="30"
+                        Padding="5,5,5,5"
+                        HorizontalContentAlignment="Center"
+                        VerticalContentAlignment="Center"
+                        Content="✖"
+                        FontSize="12"
+                        CornerRadius="100"
+                        Command="{Binding CloseCommand}"/>
+            </Grid>
+
+            <!-- Main Content -->
+            <Grid Grid.Row="1"
+                  Margin="30,0,30,0"
+                  ColumnDefinitions="*, Auto">
+                <!-- Video Input Section -->
+                <Grid Grid.Column="0">
+                    <StackPanel Spacing="10" >
+                        <Border>
+                            <StackPanel Spacing="10">
+                                <TextBlock Text="Select Video"/>
+                                <Border BorderBrush="Gray"
+                                        BorderThickness="2"
+                                        CornerRadius="8">
+                                    <Grid ColumnDefinitions="*,Auto"
+                                          ColumnSpacing="10">
+                                        <TextBox Grid.Column="0"
+                                                 Text="{Binding VideoPath}"
+                                                 Watermark="Select video file..."
+                                                 IsReadOnly="False"
+                                                 BorderBrush="Transparent"
+                                                 BorderThickness="0"
+                                                 Background="Transparent"
+                                                 FocusAdorner="{x:Null}"
+                                                 Margin="5, 5, 0, 5"/>
+                                        <Button Grid.Column="1" 
+                                                Content="Browse"
+                                                HorizontalContentAlignment="Center"
+                                                VerticalContentAlignment="Center"
+                                                Background="Transparent"
+                                                FocusAdorner="{x:Null}"
+                                                Width="100"
+                                                Margin="0, 0, 8, 0"
+                                                Command="{Binding BrowseVideoCommand}"/>
+                                    </Grid>
+                                </Border>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Output Directory Section -->
+                        <Border>
+                            <StackPanel Spacing="10">
+                                <TextBlock Text="Select Output Directory"/>
+                                <Border BorderBrush="Gray"
+                                        BorderThickness="2"
+                                        CornerRadius="8">
+                                    <Grid ColumnDefinitions="*,Auto"
+                                          ColumnSpacing="10">
+                                        <TextBox Grid.Column="0" 
+                                                 Text="{Binding OutputDirectory}"
+                                                 Watermark="Select output directory..."
+                                                 IsReadOnly="False"
+                                                 BorderBrush="Transparent"
+                                                 BorderThickness="0"
+                                                 Background="Transparent"
+                                                 FocusAdorner="{x:Null}"
+                                                 Margin="5, 5, 0, 5"/>
+                                        <Button Grid.Column="1" 
+                                                Content="Browse"
+                                                HorizontalContentAlignment="Center"
+                                                VerticalContentAlignment="Center"
+                                                Background="Transparent"
+                                                FocusAdorner="{x:Null}"
+                                                Width="100"
+                                                Margin="0, 0, 8, 0"
+                                                Command="{Binding BrowseOutputCommand}"/>
+                                    </Grid>
+                                </Border>
+                            </StackPanel>
+                        </Border>
+                        
+                        <StackPanel Spacing="10">
+                            <!-- Start Time -->
+                            <StackPanel>
+                                <Grid ColumnDefinitions="*, Auto">
+                                    <TextBlock Grid.Column="0"
+                                               Text="Start Time"/>
+                                    <TextBlock Grid.Column="1"
+                                               Text="{Binding StartTimeFormatted}" FontSize="10"/>
+                                </Grid>
+                                <Slider Minimum="0"
+                                        Maximum="{Binding VideoDurationInSeconds}"
+                                        Value="{Binding StartTimeSeconds, Mode=TwoWay}"
+                                        IsEnabled="{Binding DurationAdjust}"/>
+                            </StackPanel>
+
+                            <!-- End Time -->
+                            <StackPanel>
+                                <Grid ColumnDefinitions="*, Auto">
+                                    <TextBlock Grid.Column="0"
+                                               Text="End Time"/>
+                                    <TextBlock Grid.Column="1"
+                                               Text="{Binding EndTimeFormatted}" FontSize="10"/>
+                                </Grid>
+                                <Slider Minimum="0"
+                                        Maximum="{Binding VideoDurationInSeconds}"
+                                        Value="{Binding EndTimeSeconds, Mode=TwoWay}"
+                                        IsEnabled="{Binding DurationAdjust}"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </StackPanel>
+                </Grid>
+                
+                <Border Grid.Column="1" BorderThickness="2"
+                        BorderBrush="Gray"
+                        Margin="30, 0, 0, 0"
+                        Padding="20"
+                        CornerRadius="20">
+                    <Grid RowDefinitions="Auto, Auto, Auto">
+                        <StackPanel Grid.Row="0">
+                            <TextBlock Text="{Binding Fps, StringFormat='{}{0} FPS'}"/>
+                            <Slider Minimum="0"
+                                    Maximum="60"
+                                    Value="{Binding Fps, Mode=TwoWay}"
+                                    TickFrequency="1"
+                                    IsSnapToTickEnabled="True"
+                                    Orientation="Horizontal"
+                                    Width="250"
+                                    IsEnabled="{Binding DurationAdjust}"/>
+                        </StackPanel>
+                        <StackPanel Grid.Row="1">
+                            <TextBlock Text="Frame Name"/>
+                            <TextBox Text="{Binding FrameName}"/>
+                        </StackPanel>
+                        <StackPanel Grid.Row="2"
+                                    Margin="0, 10, 0, 0">
+                            <TextBlock Text="Format"/>
+                            <ComboBox SelectedItem="{Binding SelectedFormat}"
+                                      ItemsSource="{Binding Formats}"
+                                      HorizontalAlignment="Stretch"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+            </Grid>
+            
+            <StackPanel Grid.Row="2"
+                        Spacing="10"
+                        Margin="0, 10, 0, 20">
+                        <!-- Extract Button -->
+                        <Button Content="Extract Frames"
+                                HorizontalAlignment="Center"
+                                HorizontalContentAlignment="Center"
+                                VerticalContentAlignment="Center"
+                                Height="40"
+                                Width="500"
+                                Margin="0,10,0,0"
+                                CornerRadius="100"
+                                Command="{Binding ExtractFramesCommand}"
+                                IsEnabled="{Binding CanExtract}"/>
+                
+                        <!-- Progress Section -->
+                        <Border IsVisible="{Binding IsExtracting}">
+                            <StackPanel Spacing="10">
+                                <TextBlock Text="{Binding ProgressText}"
+                                           HorizontalAlignment="Center"
+                                           Foreground="White"/>
+                                <ProgressBar IsIndeterminate="True"/>
+                            </StackPanel>
+                        </Border>
+            </StackPanel>
+        </Grid>
+    </Border>
+</Window>

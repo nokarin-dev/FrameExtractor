@@ -1,170 +1,74 @@
-name: Build & Release
+name: Release
 
 on:
   push:
     tags:
-      - "v*"
-
-permissions:
-  contents: write
+      - 'v*.*.*'
 
 jobs:
-  build:
-    name: Build on ${{ matrix.os }}-${{ matrix.arch }}
+  publish:
+    name: Build & Release FrameExtractor
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-        arch: [x86_64, arm64]
+        os: [ubuntu-latest, windows-latest]
+        rid: [win-x64, linux-x64]
         exclude:
           - os: windows-latest
-            arch: arm64 # unsupported
+            rid: linux-x64
+          - os: ubuntu-latest
+            rid: win-x64
 
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - name: Set Up Qt
-        uses: jurplel/install-qt-action@v3
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
         with:
-          version: "6.7.1"
-          target: desktop
+          dotnet-version: '8.0.x'
 
-      - name: Build
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Publish
         run: |
-          mkdir -p build && cd build
-          cmake .. -DCMAKE_BUILD_TYPE=Release
-          cmake --build . --config Release
-
-      - name: Run Tests
-        run: cd build && ctest --output-on-failure || true
-
-      - name: Bundle Qt (Windows)
-        if: matrix.os == 'windows-latest'
-        shell: pwsh
-        run: |
-          & "${env:Qt6_DIR}\bin\windeployqt.exe" --release --compiler-runtime --verbose=2 build\Release\FrameExtractor.exe
-
-      - name: Bundle Qt (macOS)
-        if: matrix.os == 'macos-latest'
-        run: |
-          macdeployqt build/FrameExtractor.app
-
-      - name: Package (Windows)
-        if: runner.os == 'Windows'
-        shell: cmd
-        run: |
-          mkdir release
-          xcopy /E /Y build\Release\* release\
-
-      - name: Package (macOS)
-        if: runner.os == 'macOS'
+          dotnet publish FrameExtractor.csproj \
+            -c Release \
+            -r ${{ matrix.rid }} \
+            --self-contained true \
+            -p:PublishSingleFile=true \
+            -p:IncludeNativeLibrariesForSelfExtract=true \
+            -p:PublishTrimmed=true \
+            -p:DebugType=None \
+            -p:DebugSymbols=false \
+            -o publish
+        env:
+          DOTNET_CLI_TELEMETRY_OPTOUT: 1
+        
+      - name: Prepare artifacts
         run: |
           mkdir -p release
-          hdiutil create FrameExtractor.dmg -volname FrameExtractor -srcfolder build/
-          mv FrameExtractor.dmg release/FrameExtractor-macos-${{ matrix.arch }}.dmg
 
-      - name: Package (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          mkdir -p release
-          cp build/FrameExtractor release/FrameExtractor-linux-${{ matrix.arch }}
-
-      - name: Zip Windows Build
-        if: runner.os == 'Windows'
-        shell: powershell
-        run: |
-          Compress-Archive -Path release\* -DestinationPath release\FrameExtractor-windows-${{ matrix.arch }}.zip
-
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: FrameExtractor-${{ matrix.os }}-${{ matrix.arch }}
-          path: |
-            release/FrameExtractor-*
-
-  appimage:
-    name: Build AppImage
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
-
-      - name: Set Up Qt
-        uses: jurplel/install-qt-action@v3
-        with:
-          version: "6.7.1"
-          target: desktop
-
-      - name: Install FUSE
-        run: sudo apt-get update && sudo apt-get install -y libfuse2
-
-      - name: Build App
-        run: |
-          mkdir -p build && cd build
-          cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="${Qt6_DIR}"
-          cmake --build . --config Release
-
-      - name: Prepare AppDir
-        run: |
-          mkdir -p AppDir/usr/bin
-          cp build/FrameExtractor AppDir/usr/bin/
-          cp packaging/AppRun AppDir/
-          cp packaging/FrameExtractor.desktop AppDir/
-          cp packaging/icon.png AppDir/
-          chmod +x AppDir/AppRun
-
-      - name: Build AppImage
-        run: |
-          wget -q https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
-          chmod +x appimagetool-x86_64.AppImage
-          ./appimagetool-x86_64.AppImage AppDir
-          mv Frame_Extractor-*.AppImage FrameExtractor-x86_64.AppImage
-
-      - name: Upload AppImage
-        uses: actions/upload-artifact@v4
-        with:
-          name: FrameExtractor.AppImage
-          path: FrameExtractor-x86_64.AppImage
-
-  publish:
-    name: Create GitHub Release
-    needs: [build, appimage]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Repo
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-
-      - name: Generate Changelog
-        id: changelog
-        run: |
-          LAST_TAG=$(git tag --sort=-creatordate | head -n 2 | tail -n 1)
-          if [ -z "$LAST_TAG" ]; then
-            git log --pretty=format:"%s" > raw_log.txt
+          if [[ "${{ matrix.rid }}" == "win-x64" ]]; then
+            cp publish/FrameExtractor.exe release/
           else
-            git log "$LAST_TAG"..HEAD --pretty=format:"%s" > raw_log.txt
+            cp publish/FrameExtractor release/
+            chmod +x release/FrameExtractor
           fi
-          echo "CHANGELOG<<EOF" >> $GITHUB_OUTPUT
-          echo "### Changelog for ${{ github.ref_name }}" >> $GITHUB_OUTPUT
-          echo >> $GITHUB_OUTPUT
-          grep '^feat' raw_log.txt | sed 's/^/- /' >> $GITHUB_OUTPUT || true
-          grep '^fix' raw_log.txt | sed 's/^/- /' >> $GITHUB_OUTPUT || true
-          grep -vE '^(feat|fix)' raw_log.txt | sed 's/^/- /' >> $GITHUB_OUTPUT || true
-          echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Download Artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
+          # Generate SHA256 checksums
+          cd release
+          for file in *; do
+            sha256sum "$file" > "$file.sha256"
+          done
+        shell: bash
 
-      - name: Publish Release
+      - name: Upload release artifacts
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}
-          name: Release ${{ github.ref_name }}
-          body: ${{ steps.changelog.outputs.CHANGELOG }}
-          files: artifacts/**
+          files: |
+            release/FrameExtractor*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
