@@ -1,4 +1,5 @@
 # FrameExtractor
+<img width="1366" height="736" alt="Screenshot From 2025-08-07 21-11-30" src="https://github.com/user-attachments/assets/31d82e9f-2553-4fbc-b925-9cf1eaf303e1" />
 
 <div align="center">
   <a href="https://github.strivo.xyz/nekoui-download/releases">
