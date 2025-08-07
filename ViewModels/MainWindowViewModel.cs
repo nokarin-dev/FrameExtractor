@@ -25,14 +25,19 @@ public class MainWindowViewModel : AvaloniaDialogsInternalViewModelBase
     private readonly FFmpegService _ffmpegService;
     private string _videoPath = string.Empty;
     private string _outputDirectory = string.Empty;
-    private string _startTime = "00:00:00";
-    private string _endTime = "00:00:05";
-    private string _fps = "10";
+    private int _fps = 10;
     private string _frameName = "frame";
     private string _selectedFormat = "png";
-    private bool _isExtracting = false;
+    private bool _isExtracting;
+    private bool _durationAdjust;
     private string _progressText = string.Empty;
-
+    private double _startTimeSeconds;
+    private double _endTimeSeconds;
+    private double _videoDurationInSeconds;
+    
+    public string StartTimeFormatted => FormatTime(StartTimeSeconds);
+    public string EndTimeFormatted => FormatTime(EndTimeSeconds);
+    
     public MainWindowViewModel()
     {
         _ffmpegService = new FFmpegService();
@@ -63,6 +68,15 @@ public class MainWindowViewModel : AvaloniaDialogsInternalViewModelBase
         }
     }
 
+    public bool DurationAdjust
+    {
+        get => _durationAdjust;
+        set {
+            this.RaiseAndSetIfChanged(ref _durationAdjust, value);
+            this.RaisePropertyChanged(nameof(CanExtract));
+        }
+    }
+
     public string OutputDirectory
     {
         get => _outputDirectory;
@@ -72,20 +86,34 @@ public class MainWindowViewModel : AvaloniaDialogsInternalViewModelBase
             this.RaisePropertyChanged(nameof(CanExtract));
         }
     }
-
-    public string StartTime
+    
+    public double VideoDurationInSeconds
     {
-        get => _startTime;
-        set => this.RaiseAndSetIfChanged(ref _startTime, value);
+        get => _videoDurationInSeconds;
+        set => this.RaiseAndSetIfChanged(ref _videoDurationInSeconds, value);
+    }
+    
+    public double StartTimeSeconds
+    {
+        get => _startTimeSeconds;
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _startTimeSeconds, value);
+            this.RaisePropertyChanged(nameof(StartTimeFormatted));
+        }
+    }
+    
+    public double EndTimeSeconds
+    {
+        get => _endTimeSeconds;
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _endTimeSeconds, value);
+            this.RaisePropertyChanged(nameof(EndTimeFormatted));
+        }
     }
 
-    public string EndTime
-    {
-        get => _endTime;
-        set => this.RaiseAndSetIfChanged(ref _endTime, value);
-    }
-
-    public string Fps
+    public int Fps
     {
         get => _fps;
         set => this.RaiseAndSetIfChanged(ref _fps, value);
@@ -147,10 +175,6 @@ public class MainWindowViewModel : AvaloniaDialogsInternalViewModelBase
                 new FilePickerFileType("Video Files")
                 {
                     Patterns = new[] { "*.mp4", "*.avi", "*.mov", "*.mkv", "*.wmv", "*.flv", "*.webm" }
-                },
-                new FilePickerFileType("All Files")
-                {
-                    Patterns = new[] { "*.*" }
                 }
             }
         });
@@ -158,6 +182,7 @@ public class MainWindowViewModel : AvaloniaDialogsInternalViewModelBase
         if (files.Count > 0)
         {
             VideoPath = files[0].Path.LocalPath;
+            DurationAdjust = true;
         }
     }
 
@@ -189,7 +214,17 @@ public class MainWindowViewModel : AvaloniaDialogsInternalViewModelBase
             var duration = await _ffmpegService.GetVideoDurationAsync(videoPath);
             if (!string.IsNullOrEmpty(duration))
             {
-                EndTime = duration;
+                if (TimeSpan.TryParse(duration, out var ts))
+                {
+                    VideoDurationInSeconds = ts.TotalSeconds;
+
+                    // Auto set end time to video duration
+                    EndTimeSeconds = ts.TotalSeconds;
+
+                    // Optional: Reset start time too if needed
+                    if (StartTimeSeconds > EndTimeSeconds)
+                        StartTimeSeconds = 0;
+                }
             }
         }
         catch
@@ -223,9 +258,9 @@ public class MainWindowViewModel : AvaloniaDialogsInternalViewModelBase
             {
                 VideoPath = VideoPath,
                 OutputDirectory = OutputDirectory,
-                StartTime = StartTime,
-                EndTime = EndTime,
-                Fps = int.Parse(Fps),
+                StartTime = StartTimeFormatted,
+                EndTime = EndTimeFormatted,
+                Fps = Fps,
                 FrameNamePrefix = FrameName,
                 Format = SelectedFormat
             };
@@ -279,13 +314,13 @@ public class MainWindowViewModel : AvaloniaDialogsInternalViewModelBase
             return false;
         }
 
-        if (!IsValidTimeFormat(StartTime) || !IsValidTimeFormat(EndTime))
+        if (!IsValidTimeFormat(StartTimeFormatted) || !IsValidTimeFormat(EndTimeFormatted))
         {
             ShowError("Time Format Error", "Please use HH:MM:SS format for time values.").GetAwaiter().GetResult();
             return false;
         }
 
-        if (!int.TryParse(Fps, out int fps) || fps <= 0)
+        if (Fps <= 0)
         {
             ShowError("FPS Error", "Please enter a valid FPS value.").GetAwaiter().GetResult();
             return false;
@@ -329,6 +364,12 @@ public class MainWindowViewModel : AvaloniaDialogsInternalViewModelBase
                 title, message, ButtonEnum.Ok, Icon.Error);
             await messageBox.ShowWindowDialogAsync(mainWindow);
         }
+    }
+    
+    private string FormatTime(double totalSeconds)
+    {
+        TimeSpan ts = TimeSpan.FromSeconds(totalSeconds);
+        return ts.ToString(@"hh\:mm\:ss");
     }
 
     private static void CloseApplication()

@@ -11,6 +11,9 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         DataContext = new MainWindowViewModel();
+        ExtendClientAreaToDecorationsHint = true;
+        ExtendClientAreaChromeHints = Avalonia.Platform.ExtendClientAreaChromeHints.NoChrome;
+        SystemDecorations = SystemDecorations.None;
         
         // Enable window dragging
         this.PointerPressed += OnPointerPressed;

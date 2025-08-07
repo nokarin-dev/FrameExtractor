@@ -6,9 +6,7 @@
         WindowStartupLocation="CenterOwner"
         CanResize="True"
         MinWidth="500"
-        MinHeight="300"
-        ExtendClientAreaToDecorationsHint="True"
-        ExtendClientAreaChromeHints="NoChrome">
+        MinHeight="300">
 
     <Border CornerRadius="8" ClipToBounds="True">
         <Grid RowDefinitions="Auto,*,Auto">

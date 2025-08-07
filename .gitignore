@@ -1,5 +1,5 @@
-# Created by https://www.toptal.com/developers/gitignore/api/intellij+all,csharp,macos,linux,windows
-# Edit at https://www.toptal.com/developers/gitignore?templates=intellij+all,csharp,macos,linux,windows
+# Created by https://www.toptal.com/developers/gitignore/api/redis,csharp,macos,linux,windows,intellij+all
+# Edit at https://www.toptal.com/developers/gitignore?templates=redis,csharp,macos,linux,windows,intellij+all
 
 ### Csharp ###
 ## Ignore Visual Studio temporary files, build results, and
@@ -534,6 +534,11 @@ Temporary Items
 # iCloud generated files
 *.icloud
 
+### Redis ###
+# Ignore redis binary dump (dump.rdb) files
+
+*.rdb
+
 ### Windows ###
 # Windows thumbnail cache files
 Thumbs.db
@@ -555,4 +560,4 @@ $RECYCLE.BIN/
 # Windows shortcuts
 *.lnk
 
-# End of https://www.toptal.com/developers/gitignore/api/intellij+all,csharp,macos,linux,windows
+# End of https://www.toptal.com/developers/gitignore/api/redis,csharp,macos,linux,windows,intellij+all

@@ -8,6 +8,8 @@ public partial class ErrorDialog : Window
     public ErrorDialog(string errorLog)
     {
         InitializeComponent();
+        ExtendClientAreaToDecorationsHint = true;
+        ExtendClientAreaChromeHints = Avalonia.Platform.ExtendClientAreaChromeHints.NoChrome;
         
         if (LogTextBlock != null)
         {

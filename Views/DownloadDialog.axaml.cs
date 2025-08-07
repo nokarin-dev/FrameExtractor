@@ -8,6 +8,8 @@ public partial class DownloadDialog : Window
     public DownloadDialog()
     {
         InitializeComponent();
+        ExtendClientAreaToDecorationsHint = true;
+        ExtendClientAreaChromeHints = Avalonia.Platform.ExtendClientAreaChromeHints.NoChrome;
     }
 
     public void UpdateProgress(int percent, string statusText)

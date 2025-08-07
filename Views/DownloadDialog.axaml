@@ -4,9 +4,7 @@
         Title="Downloading FFmpeg"
         Width="400" Height="120"
         WindowStartupLocation="CenterOwner"
-        CanResize="False"
-        ExtendClientAreaToDecorationsHint="True"
-        ExtendClientAreaChromeHints="NoChrome">
+        CanResize="False">
 
     <Border CornerRadius="8" ClipToBounds="True">
         <Grid RowDefinitions="Auto,*,Auto">

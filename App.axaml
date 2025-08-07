@@ -3,11 +3,10 @@
              x:Class="FrameExtractor.App"
              RequestedThemeVariant="Default">
     <Application.Styles>
-        <FluentTheme>
-            <FluentTheme.Palettes>
-                <ColorPaletteResources x:Key="Light" Accent="#ff8961cc" AltHigh="White" AltLow="White" AltMedium="White" AltMediumHigh="White" AltMediumLow="White" BaseHigh="Black" BaseLow="#ffeeceff" BaseMedium="#ffa987bc" BaseMediumHigh="#ff7b5890" BaseMediumLow="#ff9270a6" ChromeAltLow="#ff7b5890" ChromeBlackHigh="Black" ChromeBlackLow="#ffeeceff" ChromeBlackMedium="#ff7b5890" ChromeBlackMediumLow="#ffa987bc" ChromeDisabledHigh="#ffeeceff" ChromeDisabledLow="#ffa987bc" ChromeGray="#ff9270a6" ChromeHigh="#ffeeceff" ChromeLow="#fffeeaff" ChromeMedium="#fffbe4ff" ChromeMediumLow="#fffeeaff" ChromeWhite="White" ListLow="#fffbe4ff" ListMedium="#ffeeceff" RegionColor="#fffef6ff" />
-                <ColorPaletteResources x:Key="Dark" Accent="#ff7a4d94" AltHigh="Black" AltLow="Black" AltMedium="Black" AltMediumHigh="Black" AltMediumLow="Black" BaseHigh="White" BaseLow="#ff33273c" BaseMedium="#ff9d92a5" BaseMediumHigh="#ffb8adbf" BaseMediumLow="#ff685d70" ChromeAltLow="#ffb8adbf" ChromeBlackHigh="Black" ChromeBlackLow="#ffb8adbf" ChromeBlackMedium="Black" ChromeBlackMediumLow="Black" ChromeDisabledHigh="#ff33273c" ChromeDisabledLow="#ff9d92a5" ChromeGray="#ff83778b" ChromeHigh="#ff83778b" ChromeLow="#ff1a0929" ChromeMedium="#ff20112e" ChromeMediumLow="#ff2d2037" ChromeWhite="White" ListLow="#ff20112e" ListMedium="#ff33273c" RegionColor="#ff15151f" />
-            </FluentTheme.Palettes>
-        </FluentTheme>
+        <FluentTheme />
+        <Style Selector="TextBox:focus">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+        </Style>
     </Application.Styles>
 </Application>

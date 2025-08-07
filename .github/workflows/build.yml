@@ -1,44 +1,33 @@
-name: Build CI
+name: Build
 
 on:
   push:
-    branches:
-      - main
+    branches: ["main", "master"]
 
 jobs:
   build:
-    name: Build App on ${{ matrix.os }} - ${{ matrix.arch }}
+    name: Build on ${{ matrix.os }}-${{ matrix.arch }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        arch: [x86_64, arm64]
-        exclude:
-          - os: windows-latest
-            arch: arm64 # unsupported
+        arch: x86_64
 
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - name: Install Qt (Cross-platform)
-        uses: jurplel/install-qt-action@v3
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
         with:
-          version: "6.7.1"
-          target: "desktop"
+          dotnet-version: '8.x'
 
-      - name: Set CMake Architecture Flags (macOS only)
-        if: matrix.os == 'macos-latest'
-        run: echo "CMAKE_OSX_ARCHITECTURES=${{ matrix.arch }}" >> $GITHUB_ENV
+      - name: Restore dependencies
+        run: dotnet restore
 
-      - name: Build App
-        run: |
-          mkdir -p build
-          cd build
-          cmake .. -DCMAKE_BUILD_TYPE=Release ${CMAKE_OSX_ARCHITECTURES:+-DCMAKE_OSX_ARCHITECTURES=$CMAKE_OSX_ARCHITECTURES}
-          cmake --build . --config Release
+      - name: Build project
+        run: dotnet build --configuration Release --no-restore
 
-      - name: Run QTest Unit Tests
-        run: |
-          cd build
-          ctest --output-on-failure || true
+      - name: Run tests
+        run: dotnet test --no-build --verbosity normal
+        continue-on-error: true

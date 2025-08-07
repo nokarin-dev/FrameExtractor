@@ -6,7 +6,7 @@ The format is based on [Conventional Commits](https://www.conventionalcommits.or
 
 ---
 
-## [v1.0.5] - --/--/2025
+## [v1.0.5] - 07/08/2025
 
 First public release of **FrameExtractor (Avalonia Edition)**
 
@@ -20,6 +20,7 @@ First public release of **FrameExtractor (Avalonia Edition)**
 - Real-time status feedback with progress indicator
 - Works on **Windows** and **Linux** (macOS support coming soon)
 - Publish-ready standalone builds via `.NET 8`
+- New fresh GUI
 
 ---
 

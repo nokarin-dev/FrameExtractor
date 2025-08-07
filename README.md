@@ -38,7 +38,6 @@ Head to the [Releases page](https://github.com/nokarin-dev/FrameExtractor/releas
 
 - `FrameExtractor.exe` (Windows)
 - `FrameExtractor.AppImage` (Linux)
--  macOS version (coming soon)
 
 ---
 
