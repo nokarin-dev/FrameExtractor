@@ -45,7 +45,7 @@ jobs:
             -o publish
         env:
           DOTNET_CLI_TELEMETRY_OPTOUT: 1
-  	shell: bash
+        shell: bash
         
       - name: Prepare artifacts
         run: |
