@@ -6,12 +6,11 @@ on:
 
 jobs:
   build:
-    name: Build on ${{ matrix.os }}-${{ matrix.arch }}
+    name: Build FrameExtractor
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        arch: x86_64
 
     steps:
       - name: Checkout repository
