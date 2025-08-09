@@ -25,24 +25,59 @@ public class FFmpegService
     public FFmpegService()
     {
         _httpClient = new HttpClient();
+        Logger.Info("Initialized FFmpegService");
     }
 
     public async Task<bool> EnsureFFmpegAvailableAsync()
     {
+        Logger.Info("Checking for FFmpeg availability");
+        
         _ffmpegPath = FindFFmpegExecutable();
         
         if (!string.IsNullOrEmpty(_ffmpegPath))
         {
-            Console.WriteLine($"FFmpeg found at: {_ffmpegPath}");
+            Logger.Info($"FFmpeg found at: {_ffmpegPath}");
             return true;
         }
 
-        Console.WriteLine("FFmpeg not found, attempting to install...");
-        return await InstallFFmpegAsync();
+        Logger.Warning("FFmpeg not found on system, attempting to install");
+        var installResult = await InstallFFmpegAsync();
+        
+        if (!installResult)
+        {
+            Logger.Error("Failed to install FFmpeg");
+            await ShowFFmpegNotFoundDialog();
+            return false;
+        }
+        
+        Logger.Info("FFmpeg installation completed successfully");
+        return true;
+    }
+
+    private async Task ShowFFmpegNotFoundDialog()
+    {
+        var mainWindow = GetMainWindow();
+        if (mainWindow != null)
+        {
+            var messageBox = MessageBoxManager.GetMessageBoxStandard(
+                "FFmpeg Required",
+                "FFmpeg could not be found or installed automatically.\n\n" +
+                "Please install FFmpeg manually:\n" +
+                "• Windows: Download from https://ffmpeg.org/download.html\n" +
+                "• macOS: Install with 'brew install ffmpeg'\n" +
+                "• Linux: Install with your package manager (e.g., 'sudo apt install ffmpeg')\n\n" +
+                "After installation, restart the application.",
+                ButtonEnum.Ok,
+                Icon.Warning);
+            
+            await messageBox.ShowWindowDialogAsync(mainWindow);
+        }
     }
 
     private string? FindFFmpegExecutable()
     {
+        Logger.Debug("Searching for FFmpeg executable");
+        
         // Check if ffmpeg is in PATH
         var pathVar = Environment.GetEnvironmentVariable("PATH");
         if (!string.IsNullOrEmpty(pathVar))
@@ -53,6 +88,7 @@ public class FFmpegService
                 var ffmpegPath = Path.Combine(path, RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "ffmpeg.exe" : "ffmpeg");
                 if (File.Exists(ffmpegPath))
                 {
+                    Logger.Debug($"Found FFmpeg in PATH: {ffmpegPath}");
                     return ffmpegPath;
                 }
             }
@@ -62,12 +98,15 @@ public class FFmpegService
         var commonPaths = GetCommonFFmpegPaths();
         foreach (var path in commonPaths)
         {
+            Logger.Debug($"Checking common path: {path}");
             if (File.Exists(path))
             {
+                Logger.Debug($"Found FFmpeg at common path: {path}");
                 return path;
             }
         }
 
+        Logger.Debug("FFmpeg executable not found in any common locations");
         return null;
     }
 
@@ -111,6 +150,8 @@ public class FFmpegService
     {
         try
         {
+            Logger.Info("Starting FFmpeg installation process");
+            
             string downloadUrl;
             string archiveExtension;
             string executableName;
@@ -121,6 +162,7 @@ public class FFmpegService
                 if (await TryInstallWithWingetAsync())
                 {
                     _ffmpegPath = "ffmpeg";
+                    Logger.Info("FFmpeg installed successfully using winget");
                     return true;
                 }
 
@@ -144,6 +186,7 @@ public class FFmpegService
             var appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
             var ffmpegDir = Path.Combine(appDataPath, "FrameExtractor", "ffmpeg");
             Directory.CreateDirectory(ffmpegDir);
+            Logger.Info($"Using installation directory: {ffmpegDir}");
 
             var archivePath = Path.Combine(ffmpegDir, $"ffmpeg{archiveExtension}");
 
@@ -157,7 +200,7 @@ public class FFmpegService
 
             try
             {
-                Console.WriteLine($"Downloading FFmpeg from: {downloadUrl}");
+                Logger.Info($"Downloading FFmpeg from: {downloadUrl}");
                 
                 using var response = await _httpClient.GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead);
                 response.EnsureSuccessStatusCode();
@@ -184,9 +227,8 @@ public class FFmpegService
                 }
 
                 downloadDialog.UpdateProgress(100, "Extracting archive...");
+                Logger.Info("Download completed, extracting archive");
 
-                Console.WriteLine("Extracting FFmpeg archive...");
-                
                 var extractPath = Path.Combine(ffmpegDir, "extracted");
                 Directory.CreateDirectory(extractPath);
 
@@ -205,11 +247,11 @@ public class FFmpegService
 
                 if (string.IsNullOrEmpty(_ffmpegPath))
                 {
-                    Console.WriteLine("Could not find FFmpeg executable after extraction");
+                    Logger.Error("Could not find FFmpeg executable after extraction");
                     return false;
                 }
 
-                Console.WriteLine($"FFmpeg installed successfully at: {_ffmpegPath}");
+                Logger.Info($"FFmpeg installed successfully at: {_ffmpegPath}");
                 downloadDialog.UpdateProgress(100, "FFmpeg installed successfully!");
                 
                 await Task.Delay(1000); // Show success message briefly
@@ -222,7 +264,7 @@ public class FFmpegService
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Failed to install FFmpeg: {ex.Message}");
+            Logger.Error($"Failed to install FFmpeg: {ex.Message}", ex);
             return false;
         }
     }
@@ -231,6 +273,8 @@ public class FFmpegService
     {
         try
         {
+            Logger.Info("Checking winget availability");
+            
             var checkProcess = new Process
             {
                 StartInfo = new ProcessStartInfo
@@ -248,6 +292,8 @@ public class FFmpegService
 
             if (checkProcess.ExitCode == 0)
             {
+                Logger.Info("Winget is available, asking user for permission");
+                
                 // Winget is available, ask user if they want to use it
                 var mainWindow = GetMainWindow();
                 if (mainWindow != null)
@@ -262,6 +308,8 @@ public class FFmpegService
                     
                     if (result == ButtonResult.Yes)
                     {
+                        Logger.Info("User approved winget installation, starting process");
+                        
                         var installProcess = new Process
                         {
                             StartInfo = new ProcessStartInfo
@@ -275,14 +323,33 @@ public class FFmpegService
 
                         installProcess.Start();
                         await installProcess.WaitForExitAsync();
-                        return installProcess.ExitCode == 0;
+                        
+                        var success = installProcess.ExitCode == 0;
+                        if (success)
+                        {
+                            Logger.Info("Winget installation completed successfully");
+                        }
+                        else
+                        {
+                            Logger.Warning($"Winget installation failed with exit code: {installProcess.ExitCode}");
+                        }
+                        
+                        return success;
+                    }
+                    else
+                    {
+                        Logger.Info("User declined winget installation");
                     }
                 }
             }
+            else
+            {
+                Logger.Debug("Winget not available or failed to list packages");
+            }
         }
-        catch
+        catch (Exception ex)
         {
-            // Winget not available or failed
+            Logger.Debug($"Winget not available or failed: {ex.Message}");
         }
 
         return false;
@@ -291,11 +358,14 @@ public class FFmpegService
     private string? FindFFmpegInDirectory(string directory, string executableName)
     {
         var files = Directory.GetFiles(directory, executableName, SearchOption.AllDirectories);
+        Logger.Debug($"Found {files.Length} matching files in extracted directory");
         return files.Length > 0 ? files[0] : null;
     }
 
     private async Task ExtractTarArchiveAsync(string archivePath, string extractPath)
     {
+        Logger.Info($"Extracting tar archive: {archivePath}");
+        
         var process = new Process
         {
             StartInfo = new ProcessStartInfo
@@ -309,14 +379,29 @@ public class FFmpegService
 
         process.Start();
         await process.WaitForExitAsync();
+        
+        if (process.ExitCode == 0)
+        {
+            Logger.Info("Tar extraction completed successfully");
+        }
+        else
+        {
+            Logger.Error($"Tar extraction failed with exit code: {process.ExitCode}");
+        }
     }
 
     public async Task<string?> GetVideoDurationAsync(string videoPath)
     {
+        Logger.Info($"Getting duration for video: {videoPath}");
+        
         if (string.IsNullOrEmpty(_ffmpegPath))
         {
+            Logger.Warning("FFmpeg path not set, ensuring availability");
             if (!await EnsureFFmpegAvailableAsync())
+            {
+                Logger.Error("Cannot get video duration: FFmpeg not available");
                 return null;
+            }
         }
 
         try
@@ -340,23 +425,36 @@ public class FFmpegService
             var durationMatch = Regex.Match(stderr, @"Duration: (\d{2}:\d{2}:\d{2})");
             if (durationMatch.Success)
             {
-                return durationMatch.Groups[1].Value;
+                var duration = durationMatch.Groups[1].Value;
+                Logger.Info($"Video duration detected: {duration}");
+                return duration;
+            }
+            else
+            {
+                Logger.Warning("Could not parse video duration from FFmpeg output");
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error getting video duration for {videoPath}: {ex.Message}");
+            Logger.Error($"Error getting video duration for {videoPath}: {ex.Message}", ex);
         }
 
+        Logger.Info("Using default fallback duration: 00:00:05");
         return "00:00:05"; // Default fallback
     }
 
     public async Task<bool> ExtractFramesAsync(FrameExtractionParams parameters, IProgress<string>? progress = null)
     {
+        Logger.Info($"Starting frame extraction - Video: {parameters.VideoPath}, Output: {parameters.OutputDirectory}");
+        
         if (string.IsNullOrEmpty(_ffmpegPath))
         {
+            Logger.Warning("FFmpeg path not set, ensuring availability");
             if (!await EnsureFFmpegAvailableAsync())
+            {
+                Logger.Error("Cannot extract frames: FFmpeg not available");
                 return false;
+            }
         }
 
         try
@@ -366,6 +464,8 @@ public class FFmpegService
             var outputPattern = Path.Combine(parameters.OutputDirectory, $"{parameters.FrameNamePrefix}%d.{parameters.Format}");
             
             var arguments = $"-ss {parameters.StartTime} -to {parameters.EndTime} -i \"{parameters.VideoPath}\" -vf fps={parameters.Fps} -fps_mode vfr \"{outputPattern}\"";
+
+            Logger.Info($"FFmpeg arguments: {arguments}");
 
             var process = new Process
             {
@@ -379,8 +479,6 @@ public class FFmpegService
                     CreateNoWindow = true
                 }
             };
-
-            Console.WriteLine($"Running FFmpeg with arguments: {process.StartInfo.Arguments}");
 
             process.Start();
 
@@ -401,7 +499,9 @@ public class FFmpegService
                         var timeMatch = Regex.Match(chunk, @"time=(\d{2}:\d{2}:\d{2})");
                         if (timeMatch.Success)
                         {
-                            progress?.Report($"Processing: {timeMatch.Groups[1].Value}");
+                            var progressMessage = $"Processing: {timeMatch.Groups[1].Value}";
+                            progress?.Report(progressMessage);
+                            Logger.Debug(progressMessage);
                         }
                     }
                 }
@@ -412,12 +512,13 @@ public class FFmpegService
 
             if (process.ExitCode == 0)
             {
+                Logger.Info("Frame extraction completed successfully");
                 progress?.Report("Frame extraction completed successfully!");
                 return true;
             }
             else
             {
-                Console.WriteLine($"FFmpeg failed with exit code {process.ExitCode}. Error: {errorOutput}");
+                Logger.Error($"FFmpeg failed with exit code {process.ExitCode}. Error output: {errorOutput}");
                 progress?.Report("Frame extraction failed");
                 
                 // Show detailed error dialog
@@ -433,7 +534,7 @@ public class FFmpegService
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error during frame extraction: {ex.Message}");
+            Logger.Error($"Error during frame extraction: {ex.Message}", ex);
             progress?.Report("Frame extraction failed due to error");
             return false;
         }

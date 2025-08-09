@@ -24,7 +24,7 @@
                   Background="Transparent"
                   IsHitTestVisible="True"
                   Margin="15, 10, 15, 20"
-                  ColumnDefinitions="*, Auto">
+                  ColumnDefinitions="*, Auto, Auto">
                 
                 <!-- Title and Drag Area -->
                 <TextBlock Grid.Column="0"
@@ -34,8 +34,21 @@
                            Foreground="White"
                            IsHitTestVisible="False"/>
                 
-                <!-- Close Button -->
+                <!-- Log Button -->
                 <Button Grid.Column="1"
+                        Width="60" Height="30"
+                        Margin="0,0,10,0"
+                        Padding="5,5,5,5"
+                        HorizontalContentAlignment="Center"
+                        VerticalContentAlignment="Center"
+                        Content="Log"
+                        FontSize="10"
+                        CornerRadius="15"
+                        ToolTip.Tip="Show FrameExtractor log"
+                        Command="{Binding ShowLogCommand}"/>
+                
+                <!-- Close Button -->
+                <Button Grid.Column="2"
                         Width="30" Height="30"
                         Padding="5,5,5,5"
                         HorizontalContentAlignment="Center"
@@ -43,6 +56,7 @@
                         Content="✖"
                         FontSize="12"
                         CornerRadius="100"
+                        ToolTip.Tip="Close FrameExtractor"
                         Command="{Binding CloseCommand}"/>
             </Grid>
 
@@ -78,6 +92,7 @@
                                                 FocusAdorner="{x:Null}"
                                                 Width="100"
                                                 Margin="0, 0, 8, 0"
+                                                ToolTip.Tip="Select Video"
                                                 Command="{Binding BrowseVideoCommand}"/>
                                     </Grid>
                                 </Border>
@@ -110,6 +125,7 @@
                                                 FocusAdorner="{x:Null}"
                                                 Width="100"
                                                 Margin="0, 0, 8, 0"
+                                                ToolTip.Tip="Select Output Directory"
                                                 Command="{Binding BrowseOutputCommand}"/>
                                     </Grid>
                                 </Border>
@@ -128,7 +144,7 @@
                                 <Slider Minimum="0"
                                         Maximum="{Binding VideoDurationInSeconds}"
                                         Value="{Binding StartTimeSeconds, Mode=TwoWay}"
-                                        IsEnabled="{Binding DurationAdjust}"/>
+                                        IsEnabled="{Binding VideoAvailable}"/>
                             </StackPanel>
 
                             <!-- End Time -->
@@ -142,7 +158,7 @@
                                 <Slider Minimum="0"
                                         Maximum="{Binding VideoDurationInSeconds}"
                                         Value="{Binding EndTimeSeconds, Mode=TwoWay}"
-                                        IsEnabled="{Binding DurationAdjust}"/>
+                                        IsEnabled="{Binding VideoAvailable}"/>
                             </StackPanel>
                         </StackPanel>
                     </StackPanel>
@@ -163,18 +179,20 @@
                                     IsSnapToTickEnabled="True"
                                     Orientation="Horizontal"
                                     Width="250"
-                                    IsEnabled="{Binding DurationAdjust}"/>
+                                    IsEnabled="{Binding VideoAvailable}"/>
                         </StackPanel>
                         <StackPanel Grid.Row="1">
                             <TextBlock Text="Frame Name"/>
-                            <TextBox Text="{Binding FrameName}"/>
+                            <TextBox Text="{Binding FrameName}"
+                                     IsEnabled="{Binding VideoAvailable}"/>
                         </StackPanel>
                         <StackPanel Grid.Row="2"
                                     Margin="0, 10, 0, 0">
                             <TextBlock Text="Format"/>
                             <ComboBox SelectedItem="{Binding SelectedFormat}"
                                       ItemsSource="{Binding Formats}"
-                                      HorizontalAlignment="Stretch"/>
+                                      HorizontalAlignment="Stretch"
+                                      IsEnabled="{Binding VideoAvailable}"/>
                         </StackPanel>
                     </Grid>
                 </Border>
@@ -182,7 +200,7 @@
             
             <StackPanel Grid.Row="2"
                         Spacing="10"
-                        Margin="0, 10, 0, 20">
+                        Margin="0, 10, 0, 0">
                         <!-- Extract Button -->
                         <Button Content="Extract Frames"
                                 HorizontalAlignment="Center"
@@ -190,7 +208,7 @@
                                 VerticalContentAlignment="Center"
                                 Height="40"
                                 Width="500"
-                                Margin="0,10,0,0"
+                                Margin="0,10,0,10"
                                 CornerRadius="100"
                                 Command="{Binding ExtractFramesCommand}"
                                 IsEnabled="{Binding CanExtract}"/>

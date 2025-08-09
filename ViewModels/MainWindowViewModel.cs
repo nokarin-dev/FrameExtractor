@@ -29,7 +29,7 @@ public class MainWindowViewModel : AvaloniaDialogsInternalViewModelBase
     private string _frameName = "frame";
     private string _selectedFormat = "png";
     private bool _isExtracting;
-    private bool _durationAdjust;
+    private bool _videoAvailable;
     private string _progressText = string.Empty;
     private double _startTimeSeconds;
     private double _endTimeSeconds;
@@ -49,13 +49,28 @@ public class MainWindowViewModel : AvaloniaDialogsInternalViewModelBase
         BrowseOutputCommand = ReactiveCommand.CreateFromTask(BrowseOutput);
         ExtractFramesCommand = ReactiveCommand.CreateFromTask(ExtractFrames, this.WhenAnyValue(x => x.CanExtract));
         CloseCommand = ReactiveCommand.Create(CloseApplication);
+    
+        ShowLogCommand = ReactiveCommand.Create(ShowLogDialog);
+    
+        Logger.Info("Initialized MainWindowViewModel");
 
         // Auto-detect video duration when video path changes
         this.WhenAnyValue(x => x.VideoPath)
             .Where(path => !string.IsNullOrEmpty(path) && File.Exists(path))
             .Subscribe(async path => await UpdateVideoDuration(path));
     }
+    
+    private void ShowLogDialog()
+    {
+        var mainWindow = GetMainWindow();
+        if (mainWindow != null)
+        {
+            var logDialog = new FrameExtractor.Views.LogDialog();
+            logDialog.Show(mainWindow);
+        }
+    }
 
+    public ReactiveCommand<Unit, Unit> ShowLogCommand { get; }
     public ObservableCollection<string> Formats { get; }
 
     public string VideoPath
@@ -68,11 +83,11 @@ public class MainWindowViewModel : AvaloniaDialogsInternalViewModelBase
         }
     }
 
-    public bool DurationAdjust
+    public bool VideoAvailable
     {
-        get => _durationAdjust;
+        get => _videoAvailable;
         set {
-            this.RaiseAndSetIfChanged(ref _durationAdjust, value);
+            this.RaiseAndSetIfChanged(ref _videoAvailable, value);
             this.RaisePropertyChanged(nameof(CanExtract));
         }
     }
@@ -182,7 +197,7 @@ public class MainWindowViewModel : AvaloniaDialogsInternalViewModelBase
         if (files.Count > 0)
         {
             VideoPath = files[0].Path.LocalPath;
-            DurationAdjust = true;
+            VideoAvailable = true;
         }
     }
 
@@ -207,9 +222,17 @@ public class MainWindowViewModel : AvaloniaDialogsInternalViewModelBase
     {
         try
         {
+            Logger.Info($"Updating video duration for: {videoPath}");
+            
             // Ensure FFmpeg is available first
             if (!await _ffmpegService.EnsureFFmpegAvailableAsync())
+            {
+                Logger.Error("Cannot update video duration: FFmpeg not available");
+                
+                // Show an error to the user
+                await ShowError("FFmpeg Required", "FFmpeg is required to analyze videos. Please install FFmpeg and restart the application.");
                 return;
+            }
 
             var duration = await _ffmpegService.GetVideoDurationAsync(videoPath);
             if (!string.IsNullOrEmpty(duration))
@@ -224,35 +247,54 @@ public class MainWindowViewModel : AvaloniaDialogsInternalViewModelBase
                     // Optional: Reset start time too if needed
                     if (StartTimeSeconds > EndTimeSeconds)
                         StartTimeSeconds = 0;
+                    
+                    Logger.Info($"Video duration updated: {duration} ({ts.TotalSeconds} seconds)");
+                }
+                else
+                {
+                    Logger.Warning($"Failed to parse duration: {duration}");
                 }
             }
+            else
+            {
+                Logger.Warning("Could not detect video duration");
+            }
         }
-        catch
+        catch (Exception ex)
         {
-            // Ignore errors during duration detection
+            Logger.Error($"Error updating video duration for {videoPath}: {ex.Message}", ex);
+            await ShowError("Error", $"Failed to analyze video: {ex.Message}");
         }
     }
 
     private async Task ExtractFrames()
     {
+        Logger.Info("Extract frames command triggered");
+        
         // Validate inputs
         if (!ValidateInputs())
+        {
+            Logger.Warning("Input validation failed");
             return;
+        }
 
         try
         {
             IsExtracting = true;
             ProgressText = "Preparing extraction...";
+            Logger.Info("Starting frame extraction process");
 
             // Ensure FFmpeg is available
             if (!await _ffmpegService.EnsureFFmpegAvailableAsync())
             {
+                Logger.Error("Cannot extract frames: FFmpeg not available");
                 await ShowError("FFmpeg Error", "FFmpeg is not available and could not be installed.");
                 return;
             }
 
             // Create output directory
             Directory.CreateDirectory(OutputDirectory);
+            Logger.Info($"Output directory created/verified: {OutputDirectory}");
 
             var parameters = new FrameExtractionParams
             {
@@ -265,67 +307,94 @@ public class MainWindowViewModel : AvaloniaDialogsInternalViewModelBase
                 Format = SelectedFormat
             };
 
-            var progress = new Progress<string>(message => ProgressText = message);
+            Logger.Info($"Frame extraction parameters: StartTime={parameters.StartTime}, EndTime={parameters.EndTime}, FPS={parameters.Fps}, Format={parameters.Format}");
+
+            var progress = new Progress<string>(message =>
+            {
+                ProgressText = message;
+                Logger.Debug($"Progress: {message}");
+            });
+            
             var success = await _ffmpegService.ExtractFramesAsync(parameters, progress);
 
             if (success)
             {
+                Logger.Info("Frame extraction completed successfully");
                 await ShowInfo("Success", "Frames extracted successfully!");
             }
             else
             {
+                Logger.Error("Frame extraction failed");
                 await ShowError("Extraction Failed", "Failed to extract frames. Check the console for details.");
             }
         }
         catch (Exception ex)
         {
+            Logger.Error($"Exception during frame extraction: {ex.Message}", ex);
             await ShowError("Error", $"An error occurred: {ex.Message}");
         }
         finally
         {
             IsExtracting = false;
             ProgressText = string.Empty;
+            Logger.Info("Frame extraction process finished");
         }
     }
 
     private bool ValidateInputs()
     {
+        Logger.Debug("Validating user inputs");
+        
         if (string.IsNullOrWhiteSpace(VideoPath))
         {
+            Logger.Warning("Validation failed: No video file selected");
             ShowError("Validation Error", "Please select a video file.").GetAwaiter().GetResult();
             return false;
         }
 
         if (!File.Exists(VideoPath))
         {
+            Logger.Warning($"Validation failed: Video file does not exist - {VideoPath}");
             ShowError("File Error", "Selected video file does not exist.").GetAwaiter().GetResult();
             return false;
         }
 
         if (string.IsNullOrWhiteSpace(OutputDirectory))
         {
+            Logger.Warning("Validation failed: No output directory selected");
             ShowError("Validation Error", "Please select an output directory.").GetAwaiter().GetResult();
             return false;
         }
 
         if (string.IsNullOrWhiteSpace(FrameName))
         {
+            Logger.Warning("Validation failed: No frame name prefix entered");
             ShowError("Validation Error", "Please enter a frame name prefix.").GetAwaiter().GetResult();
             return false;
         }
 
         if (!IsValidTimeFormat(StartTimeFormatted) || !IsValidTimeFormat(EndTimeFormatted))
         {
+            Logger.Warning($"Validation failed: Invalid time format - Start: {StartTimeFormatted}, End: {EndTimeFormatted}");
             ShowError("Time Format Error", "Please use HH:MM:SS format for time values.").GetAwaiter().GetResult();
             return false;
         }
 
         if (Fps <= 0)
         {
+            Logger.Warning($"Validation failed: Invalid FPS value - {Fps}");
             ShowError("FPS Error", "Please enter a valid FPS value.").GetAwaiter().GetResult();
             return false;
         }
 
+        if (StartTimeSeconds >= EndTimeSeconds)
+        {
+            Logger.Warning($"Validation failed: Start time ({StartTimeSeconds}s) >= End time ({EndTimeSeconds}s)");
+            ShowError("Time Range Error", "Start time must be less than end time.").GetAwaiter().GetResult();
+            return false;
+        }
+        
+        Logger.Debug("Input validation passed");
         return true;
     }
 

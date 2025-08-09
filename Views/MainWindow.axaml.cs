@@ -1,6 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Input;
 
+using FrameExtractor.Services;
 using FrameExtractor.ViewModels;
 
 namespace FrameExtractor.Views;
@@ -17,6 +18,7 @@ public partial class MainWindow : Window
         
         // Enable window dragging
         this.PointerPressed += OnPointerPressed;
+        Logger.Info("Initialized MainWindow");
     }
 
     private void OnPointerPressed(object? sender, PointerPressedEventArgs e)

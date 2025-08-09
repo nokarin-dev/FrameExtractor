@@ -6,6 +6,17 @@ The format is based on [Conventional Commits](https://www.conventionalcommits.or
 
 ---
 
+## [v1.0.6] - 09/08/2025
+### Added
+- Dedicated logging window for better visibility of process details.
+- "Log" button on the main window for quick access to logs.
+- Tooltips for buttons to provide clearer guidance.
+
+### Improvements
+- Removed extra spacing around the progress bar for a more compact and streamlined GUI.
+
+---
+
 ## [v1.0.5] - 07/08/2025
 
 First public release of **FrameExtractor (Avalonia Edition)**
