@@ -1,4 +1,7 @@
 # FrameExtractor
+
+[![Codacy Badge](https://api.codacy.com/project/badge/Grade/272a25a7e6be4c0ab93113542e92e3dc)](https://app.codacy.com/gh/nokarin-dev/FrameExtractor?utm_source=github.com&utm_medium=referral&utm_content=nokarin-dev/FrameExtractor&utm_campaign=Badge_Grade)
+
 <img width="1366" height="736" alt="Screenshot From 2025-08-07 21-11-30" src="https://github.com/user-attachments/assets/31d82e9f-2553-4fbc-b925-9cf1eaf303e1" />
 
 <div align="center">
