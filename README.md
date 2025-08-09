@@ -1,14 +1,13 @@
 # FrameExtractor
-<img width="1366" height="736" alt="Screenshot From 2025-08-07 21-11-30" src="https://github.com/user-attachments/assets/31d82e9f-2553-4fbc-b925-9cf1eaf303e1" />
+<img width="1366" height="735" alt="Screenshot From 2025-08-09 14-29-10" src="https://github.com/user-attachments/assets/5c486cb8-20fe-4400-bc02-67f191561599" />
 
 <div align="center">
-  <a href="https://github.strivo.xyz/nekoui-download/releases">
-    <img src="https://img.shields.io/github/downloads/nokarin-dev/frameextractor/total?logo=github&labelColor=gray&color=black" alt="Total Downloads" />
-  </a>
-  <img src="https://img.shields.io/github/v/release/nokarin-dev/FrameExtractor?style=flat-square" />
-  <a href="https://github.com/nokarin-dev/FrameExtractor/actions/workflows/build.yml">
-    <img src="https://github.com/nokarin-dev/FrameExtractor/actions/workflows/build.yml/badge.svg" alt="Build Status" />
-  </a>
+  
+  [![Build Statuc](https://github.com/nokarin-dev/FrameExtractor/actions/workflows/build.yml/badge.svg)](https://github.com/nokarin-dev/FrameExtractor/actions/workflows/build.yml)
+  [![Latest Version](https://img.shields.io/github/v/release/nokarin-dev/FrameExtractor?style=flat-square)](https://github.com/nokarin-dev/FrameExtractor/releases)
+  [![Total Download](https://img.shields.io/github/downloads/nokarin-dev/frameextractor/total?logo=github&labelColor=gray&color=black)](https://github.strivo.xyz/nekoui-download/releases)
+  [![Codacy Badge](https://app.codacy.com/project/badge/Grade/abda5110f8f04f86ba2dd067dd837e3b)](https://app.codacy.com/gh/nokarin-dev/FrameExtractor/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
+  
 </div>
 
 **FrameExtractor** is a modern, cross-platform video frame extractor with a beautiful GUI built using [Avalonia UI](https://avaloniaui.net/) and [FFmpeg](https://ffmpeg.org/).  
