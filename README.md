@@ -1,5 +1,4 @@
-# FrameExtractor
-<img width="1366" height="735" alt="Screenshot From 2025-08-09 14-29-10" src="https://github.com/user-attachments/assets/5c486cb8-20fe-4400-bc02-67f191561599" />
+![FrameExtractor Banner](https://github.com/user-attachments/assets/db702882-47e6-4263-b340-691e85d5bb2a)
 
 <div align="center">
   
@@ -7,6 +6,9 @@
   [![Latest Version](https://img.shields.io/github/v/release/nokarin-dev/FrameExtractor?style=flat-square)](https://github.com/nokarin-dev/FrameExtractor/releases)
   [![Total Download](https://img.shields.io/github/downloads/nokarin-dev/frameextractor/total?logo=github&labelColor=gray&color=black)](https://github.strivo.xyz/nekoui-download/releases)
   [![Codacy Badge](https://app.codacy.com/project/badge/Grade/abda5110f8f04f86ba2dd067dd837e3b)](https://app.codacy.com/gh/nokarin-dev/FrameExtractor/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
+  [![License](https://img.shields.io/github/license/nokarin-dev/frameextractor)](https://github.com/nokarin-dev/FrameExtractor/blob/main/LICENSE)
+  [![Watch](https://img.shields.io/github/watchers/nokarin-dev/frameextractor?style=flat)](https://github.com/nokarin-dev/FrameExtractor)
+  [![Stars](https://img.shields.io/github/stars/nokarin-dev/frameextractor)](https://github.com/nokarin-dev/FrameExtractor)
   
 </div>
 
@@ -20,13 +22,14 @@ It lets you extract frames from any video file with precise control over time ra
 
 ## Features
 
-- Extract frames between specific timestamps (e.g. `00:00:05` to `00:00:15`)
-- Adjustable frame rate (FPS)
-- Supports PNG, JPG, and JPEG output formats
-- Customizable output filename prefix
-- Choose output directory with modern file/folder picker
-- Cross-platform: Windows, Linux, macOS
-- Lightweight, standalone executable with automatic FFmpeg detection
+- Extract frames between specific timestamps (e.g. `00:00:05` to `00:00:15`).
+- Adjustable frame rate (FPS).
+- Supports PNG, JPG, and JPEG output formats.
+- Customizable output filename prefix.
+- Choose output directory with modern file/folder picker.
+- Automatic FFmpeg detection (installs when missing).
+- Cross-platform: Windows, Linux, and other platfrom will be supported soon.
+- Lightweight, standalone binaries.
 
 ---
 
@@ -37,19 +40,19 @@ It lets you extract frames from any video file with precise control over time ra
 Head to the [Releases page](https://github.com/nokarin-dev/FrameExtractor/releases) and download the latest version for your platform:
 
 - `FrameExtractor.exe` (Windows)
-- `FrameExtractor.AppImage` (Linux)
+- `FrameExtractor` (Linux)
 
 ---
 
 ### 2. Usage
 
-1. Launch the app.
+1. Launch the applications.
 2. Click **Browse** to select your video.
 3. Set:
-    - **Start Time / End Time** (in HH:MM:SS)
-    - **FPS** (e.g. `10`)
-    - **Format** (e.g. PNG)
-    - **Output directory** and frame name prefix.
+   - **Start Time / End Time** (in HH:MM:SS)
+   - **FPS** (e.g. `10`)
+   - **Format** (e.g. PNG)
+   - **Output directory** and frame name prefix.
 4. Click **Extract Frames**.
 5. Wait for progress to complete — frames will be saved to your selected folder.
 
@@ -74,7 +77,9 @@ dotnet restore
 dotnet build -c Release
 dotnet run --project FrameExtractor
 ```
+
 To publish as a standalone executable:
+
 ```
 # Windows
 dotnet publish -c Release -r win-x64 --self-contained true
@@ -85,13 +90,12 @@ dotnet publish -c Release -r linux-x64 --self-contained true
 # macOS
 dotnet publish -c Release -r osx-x64 --self-contained true
 ```
+
 The executable will appear in `bin/Release/net8.0/<platform>/publish/`.
 
 ## License
+
 ```
 MIT License
-Copyright © 2025 nokarin
+Copyright © 2025 nokarin-dev
 ```
-Made with ❤️ using Avalonia & .NET
-
-Built for creators and developers who need fast, precise frame extraction.
