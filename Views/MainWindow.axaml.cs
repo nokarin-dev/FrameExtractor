@@ -1,6 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Input;
-
+using FrameExtractor.Helpers;
 using FrameExtractor.Services;
 using FrameExtractor.ViewModels;
 
@@ -12,9 +12,8 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         DataContext = new MainWindowViewModel();
-        ExtendClientAreaToDecorationsHint = true;
-        ExtendClientAreaChromeHints = Avalonia.Platform.ExtendClientAreaChromeHints.NoChrome;
-        SystemDecorations = SystemDecorations.None;
+        
+        RoundedWindowHelper.SetupRoundedWindow(this, useNativeChrome: false, cornerRadius: 16);
         
         // Enable window dragging
         this.PointerPressed += OnPointerPressed;

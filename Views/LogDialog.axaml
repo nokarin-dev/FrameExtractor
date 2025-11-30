@@ -6,81 +6,62 @@
         x:Class="FrameExtractor.Views.LogDialog"
         Title="FrameExtractor Log"
         Width="800" Height="400"
-        Background="Transparent"
         CanResize="True"
         MinWidth="600"
         MinHeight="400"
         WindowStartupLocation="CenterOwner">
     
-    <Border CornerRadius="16"
-            Background="Black"
-            ClipToBounds="True">
-        <Grid RowDefinitions="Auto,*,Auto">
-            <!-- Title Bar -->
-            <Grid Grid.Row="0" Height="40" Background="Transparent">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
+    <Grid RowDefinitions="Auto,*,Auto">
+        <!-- Title Bar -->
+        <Grid Grid.Row="0" Height="40" Background="Transparent">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
                     
-                <TextBlock Grid.Column="0"
-                           Text="FrameExtractor Log"
-                           VerticalAlignment="Center"
-                           Margin="16,0,0,0"
-                           FontWeight="SemiBold"
-                           Foreground="White"
-                           FontSize="14"/>
+            <TextBlock Grid.Column="0"
+                       Text="FrameExtractor Log"
+                       VerticalAlignment="Center"
+                       Margin="16,0,0,0"
+                       FontWeight="SemiBold"
+                       FontSize="14"/>
                     
-                <Button Grid.Column="1"
-                        Width="80" Height="25"
-                        Margin="5,7,5,7"
-                        HorizontalContentAlignment="Center"
-                        VerticalContentAlignment="Center"
-                        Content="Clear"
-                        FontSize="10"
-                        CornerRadius="16"
-                        ToolTip.Tip="Clear all the log"
-                        Click="ClearButton_Click"/>
-                
-                <Button Grid.Column="2"
-                        Width="25" Height="25"
-                        Margin="0,7,10,7"
-                        HorizontalContentAlignment="Center"
-                        VerticalContentAlignment="Center"
-                        Content="✖"
-                        FontSize="10"
-                        CornerRadius="100"
-                        ToolTip.Tip="Close Log"
-                        Click="CloseButton_Click"/>
-            </Grid>
-
-            <!-- Content -->
-            <ScrollViewer Grid.Row="1"
-                          Margin="15"
-                          x:Name="LogScrollViewer"
-                          VerticalScrollBarVisibility="Auto"
-                          HorizontalScrollBarVisibility="Auto">
-                    
-                <TextBlock x:Name="LogTextBlock"
-                           Text=""
-                           Foreground="White"
-                           FontFamily="Consolas,monospace"
-                           FontSize="11"
-                           TextWrapping="Wrap"
-                           Padding="10"/>
-            </ScrollViewer>
-            
-            <!-- Bottom Controls -->
-            <Border Grid.Row="2" Padding="15,0,15,15">
-                <Grid ColumnDefinitions="Auto,*,Auto">
-                    <CheckBox Grid.Column="0"
-                              x:Name="AutoScrollCheckBox"
-                              Content="Auto-scroll"
-                              Foreground="White"
-                              IsChecked="True"/>
-                </Grid>
-            </Border>
+            <Button Grid.Column="1"
+                    Width="80" Height="25"
+                    Margin="5,7,5,7"
+                    HorizontalContentAlignment="Center"
+                    VerticalContentAlignment="Center"
+                    Content="Clear"
+                    FontSize="10"
+                    CornerRadius="16"
+                    ToolTip.Tip="Clear all the log"
+                    Click="ClearButton_Click"/>
         </Grid>
-    </Border>
+
+        <!-- Content -->
+        <ScrollViewer Grid.Row="1"
+                      Margin="15"
+                      x:Name="LogScrollViewer"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Auto">
+                    
+            <TextBlock x:Name="LogTextBlock"
+                       Text=""
+                       FontFamily="Consolas,monospace"
+                       FontSize="11"
+                       TextWrapping="Wrap"
+                       Padding="10"/>
+        </ScrollViewer>
+            
+        <!-- Bottom Controls -->
+        <Border Grid.Row="2" Padding="15,0,15,15">
+            <Grid ColumnDefinitions="Auto,*,Auto">
+                <CheckBox Grid.Column="0"
+                          x:Name="AutoScrollCheckBox"
+                          Content="Auto-scroll"
+                          IsChecked="True"/>
+            </Grid>
+        </Border>
+    </Grid>
 </Window>

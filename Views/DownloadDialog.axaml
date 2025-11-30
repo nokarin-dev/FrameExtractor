@@ -7,38 +7,36 @@
         Title="Downloading FFmpeg"
         Width="400" Height="120"
         WindowStartupLocation="CenterOwner"
-        Background="Transparent"
-        CanResize="False">
+        CanResize="False"
+        SystemDecorations="None"
+        ExtendClientAreaChromeHints="NoChrome"
+        ExtendClientAreaToDecorationsHint="True">
 
-    <Border CornerRadius="20" Background="Black" ClipToBounds="True">
-        <Grid RowDefinitions="Auto,*,Auto">
-            <!-- Title Bar -->
-            <Grid Grid.Row="0" Height="30" Background="Transparent">
-                <TextBlock Text="Downloading FFmpeg" 
-                           VerticalAlignment="Center" 
-                           HorizontalAlignment="Center"
-                           FontWeight="SemiBold"
-                           Foreground="White"
-                           FontSize="14"/>
-            </Grid>
-
-            <!-- Content -->
-            <StackPanel Grid.Row="1" Spacing="15" Margin="20">
-                <TextBlock x:Name="StatusLabel"
-                           Text="Initializing..."
-                           Foreground="White"
-                           HorizontalAlignment="Center"
-                           FontSize="12"/>
-                
-                <ProgressBar x:Name="ProgressBar"
-                             Height="8"
-                             Minimum="0"
-                             Maximum="100"
-                             Value="0"/>
-            </StackPanel>
-            
-            <!-- Bottom spacing -->
-            <Border Grid.Row="2" Height="10"/>
+    <Grid RowDefinitions="Auto,*,Auto">
+        <!-- Title Bar -->
+        <Grid Grid.Row="0" Height="30" Background="Transparent">
+            <TextBlock Text="Downloading FFmpeg" 
+                       VerticalAlignment="Center" 
+                       HorizontalAlignment="Center"
+                       FontWeight="SemiBold"
+                       FontSize="14"/>
         </Grid>
-    </Border>
+
+        <!-- Content -->
+        <StackPanel Grid.Row="1" Spacing="15" Margin="20">
+            <TextBlock x:Name="StatusLabel"
+                       Text="Initializing..."
+                       HorizontalAlignment="Center"
+                       FontSize="12"/>
+                
+            <ProgressBar x:Name="ProgressBar"
+                         Height="8"
+                         Minimum="0"
+                         Maximum="100"
+                         Value="0"/>
+        </StackPanel>
+            
+        <!-- Bottom spacing -->
+        <Border Grid.Row="2" Height="10"/>
+    </Grid>
 </Window>

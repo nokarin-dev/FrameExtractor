@@ -1,12 +1,26 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             x:Class="FrameExtractor.App"
-             RequestedThemeVariant="Default">
+             xmlns:semi="https://irihi.tech/semi"
+             x:Class="FrameExtractor.App">
     <Application.Styles>
-        <FluentTheme />
-        <Style Selector="TextBox:focus">
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="BorderBrush" Value="Transparent"/>
-        </Style>
+        <semi:SemiTheme />
+        <semi:SemiPopupAnimations />
+        <semi:ColorPickerSemiTheme />
+        <semi:DataGridSemiTheme />
+        <semi:TreeDataGridSemiTheme />
+        
+        <!-- <FluentTheme>
+            <FluentTheme.Palettes>
+                <ColorPaletteResources x:Key="Light" Accent="#ff0073cf" AltHigh="White" AltLow="White" AltMedium="White" AltMediumHigh="White" AltMediumLow="White" BaseHigh="Black" BaseLow="#ffcccccc" BaseMedium="#ff898989" BaseMediumHigh="#ff5d5d5d" BaseMediumLow="#ff737373" ChromeAltLow="#ff5d5d5d" ChromeBlackHigh="Black" ChromeBlackLow="#ffcccccc" ChromeBlackMedium="#ff5d5d5d" ChromeBlackMediumLow="#ff898989" ChromeDisabledHigh="#ffcccccc" ChromeDisabledLow="#ff898989" ChromeGray="#ff737373" ChromeHigh="#ffcccccc" ChromeLow="#ffececec" ChromeMedium="#ffe6e6e6" ChromeMediumLow="#ffececec" ChromeWhite="White" ListLow="#ffe6e6e6" ListMedium="#ffcccccc" RegionColor="#f8f6fbff" />
+                <ColorPaletteResources x:Key="Dark" Accent="#ba007de1" AltHigh="Black" AltLow="Black" AltMedium="Black" AltMediumHigh="Black" AltMediumLow="Black" BaseHigh="White" BaseLow="#ff4c4c4c" BaseMedium="#ffa6a6a6" BaseMediumHigh="#ffbdbdbd" BaseMediumLow="#ff797979" ChromeAltLow="#ffbdbdbd" ChromeBlackHigh="Black" ChromeBlackLow="#ffbdbdbd" ChromeBlackMedium="Black" ChromeBlackMediumLow="Black" ChromeDisabledHigh="#ff4c4c4c" ChromeDisabledLow="#ffa6a6a6" ChromeGray="#ff909090" ChromeHigh="#ff909090" ChromeLow="#ff212121" ChromeMedium="#ff2c2c2c" ChromeMediumLow="#ff414141" ChromeWhite="White" ListLow="#ff2c2c2c" ListMedium="#ff4c4c4c" RegionColor="#ff1a1a1a" />
+            </FluentTheme.Palettes>
+        </FluentTheme> -->
+        
+        <FluentTheme>
+            <FluentTheme.Palettes>
+                <ColorPaletteResources x:Key="Light" Accent="#ff8961cc" AltHigh="White" AltLow="White" AltMedium="White" AltMediumHigh="White" AltMediumLow="White" BaseHigh="Black" BaseLow="#ffeeceff" BaseMedium="#ffa987bc" BaseMediumHigh="#ff7b5890" BaseMediumLow="#ff9270a6" ChromeAltLow="#ff7b5890" ChromeBlackHigh="Black" ChromeBlackLow="#ffeeceff" ChromeBlackMedium="#ff7b5890" ChromeBlackMediumLow="#ffa987bc" ChromeDisabledHigh="#ffeeceff" ChromeDisabledLow="#ffa987bc" ChromeGray="#ff9270a6" ChromeHigh="#ffeeceff" ChromeLow="#fffeeaff" ChromeMedium="#fffbe4ff" ChromeMediumLow="#fffeeaff" ChromeWhite="White" ListLow="#fffbe4ff" ListMedium="#ffeeceff" RegionColor="#fffef6ff" />
+                <ColorPaletteResources x:Key="Dark" Accent="#ff8961cc" AltHigh="#412561" AltLow="#412561" AltMedium="#412561" AltMediumHigh="#78697f" AltMediumLow="#78697f" BaseHigh="White" BaseLow="#ff64576b" BaseMedium="#ffb6aabc" BaseMediumHigh="#ffcbbfd0" BaseMediumLow="#ff8d8193" ChromeAltLow="#ffcbbfd0" ChromeBlackHigh="Black" ChromeBlackLow="#ffcbbfd0" ChromeBlackMedium="Black" ChromeBlackMediumLow="Black" ChromeDisabledHigh="#ff64576b" ChromeDisabledLow="#ffb6aabc" ChromeGray="#ffa295a8" ChromeHigh="#ffa295a8" ChromeLow="#ff332041" ChromeMedium="#ff3f2e4b" ChromeMediumLow="#ff584960" ChromeWhite="White" ListLow="#ff3f2e4b" ListMedium="#ff64576b" RegionColor="#ff262738" />
+            </FluentTheme.Palettes>
+        </FluentTheme>
     </Application.Styles>
 </Application>

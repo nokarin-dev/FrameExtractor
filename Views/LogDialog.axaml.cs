@@ -3,7 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
-
+using FrameExtractor.Helpers;
 using FrameExtractor.Services;
 
 namespace FrameExtractor.Views;
@@ -13,9 +13,8 @@ public partial class LogDialog : Window
     public LogDialog()
     {
         InitializeComponent();
-        ExtendClientAreaToDecorationsHint = true;
-        ExtendClientAreaChromeHints = Avalonia.Platform.ExtendClientAreaChromeHints.NoChrome;
-        SystemDecorations = SystemDecorations.None;
+        
+        RoundedWindowHelper.SetupRoundedWindow(this, useNativeChrome: true, cornerRadius: 16);
         
         // Subscribe to logger events
         Logger.LogUpdated += OnLogUpdated;

@@ -1,16 +1,20 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using FrameExtractor.Helpers;
 
 namespace FrameExtractor.Views;
 
 public partial class ErrorDialog : Window
 {
-    public ErrorDialog(string errorLog)
+    public ErrorDialog()
     {
         InitializeComponent();
-        ExtendClientAreaToDecorationsHint = true;
-        ExtendClientAreaChromeHints = Avalonia.Platform.ExtendClientAreaChromeHints.NoChrome;
         
+        RoundedWindowHelper.SetupRoundedWindow(this, useNativeChrome: false, cornerRadius: 16);
+    }
+    
+    public ErrorDialog(string errorLog) : this()
+    {
         if (LogTextBlock != null)
         {
             LogTextBlock.Text = errorLog;

@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Threading;
+using FrameExtractor.Helpers;
 
 namespace FrameExtractor.Views;
 
@@ -8,8 +9,8 @@ public partial class DownloadDialog : Window
     public DownloadDialog()
     {
         InitializeComponent();
-        ExtendClientAreaToDecorationsHint = true;
-        ExtendClientAreaChromeHints = Avalonia.Platform.ExtendClientAreaChromeHints.NoChrome;
+        
+        RoundedWindowHelper.SetupRoundedWindow(this, useNativeChrome: false, cornerRadius: 16);
     }
 
     public void UpdateProgress(int percent, string statusText)

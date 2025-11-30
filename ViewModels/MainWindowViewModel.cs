@@ -62,12 +62,8 @@ public class MainWindowViewModel : AvaloniaDialogsInternalViewModelBase
     
     private void ShowLogDialog()
     {
-        var mainWindow = GetMainWindow();
-        if (mainWindow != null)
-        {
-            var logDialog = new FrameExtractor.Views.LogDialog();
-            logDialog.Show(mainWindow);
-        }
+        var logDialog = new FrameExtractor.Views.LogDialog();
+        logDialog.Show();
     }
 
     public ReactiveCommand<Unit, Unit> ShowLogCommand { get; }
