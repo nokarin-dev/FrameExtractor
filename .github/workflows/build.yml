@@ -1,16 +1,24 @@
-name: Build
+name: Build & Test
 
 on:
   push:
     branches: ["main", "master"]
+  pull_request:
+    branches: ["main", "master"]
 
 jobs:
-  build:
-    name: Build FrameExtractor
-    runs-on: ${{ matrix.os }}
+  build-windows:
+    name: Build Windows - ${{ matrix.arch }} (${{ matrix.compiler }})
+    runs-on: windows-latest
     strategy:
+      fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        arch: [x64, ARM64]
+        compiler: [MSVC, MinGW]
+        exclude:
+          # MinGW doesn't support ARM64
+          - arch: ARM64
+            compiler: MinGW
 
     steps:
       - name: Checkout repository
@@ -19,14 +27,212 @@ jobs:
       - name: Setup .NET SDK
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.x'
+          dotnet-version: '8.0.x'
+
+      - name: Setup MinGW (x64 only)
+        if: matrix.compiler == 'MinGW'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-make
 
       - name: Restore dependencies
         run: dotnet restore
 
-      - name: Build project
-        run: dotnet build --configuration Release --no-restore
+      - name: Build with MSVC
+        if: matrix.compiler == 'MSVC'
+        run: |
+          dotnet build `
+            --configuration Release `
+            --no-restore `
+            -p:RuntimeIdentifier=win-${{ matrix.arch }} `
+            -p:PlatformTarget=${{ matrix.arch }}
+
+      - name: Build with MinGW
+        if: matrix.compiler == 'MinGW'
+        shell: msys2 {0}
+        run: |
+          export PATH="/mingw64/bin:$PATH"
+          dotnet build \
+            --configuration Release \
+            --no-restore \
+            -p:RuntimeIdentifier=win-x64 \
+            -p:UseMinGW=true
 
       - name: Run tests
-        run: dotnet test --no-build --verbosity normal
+        run: dotnet test --no-build --verbosity normal --configuration Release
         continue-on-error: true
+
+      - name: Publish
+        run: |
+          $rid = "win-${{ matrix.arch }}"
+          $compiler = "${{ matrix.compiler }}"
+          
+          dotnet publish FrameExtractor/FrameExtractor.csproj `
+            -c Release `
+            -r $rid `
+            -p:SelfContained=true `
+            -p:PublishSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=true `
+            -p:PublishTrimmed=false `
+            -p:DebugType=None `
+            -p:DebugSymbols=false `
+            -o artifacts/$compiler-$rid
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: FrameExtractor-Windows-${{ matrix.arch }}-${{ matrix.compiler }}
+          path: artifacts/${{ matrix.compiler }}-win-${{ matrix.arch }}/*
+          retention-days: 7
+
+  build-linux-appimage:
+    name: Build Linux AppImage - ${{ matrix.arch }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x86_64, aarch64]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Install AppImage tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget fuse libfuse2
+          
+          # Download appimagetool
+          wget https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-${{ matrix.arch }}.AppImage
+          chmod +x appimagetool-${{ matrix.arch }}.AppImage
+          sudo mv appimagetool-${{ matrix.arch }}.AppImage /usr/local/bin/appimagetool
+
+      - name: Setup cross-compilation for ARM64
+        if: matrix.arch == 'aarch64'
+        run: |
+          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Publish
+        run: |
+          if [ "${{ matrix.arch }}" == "x86_64" ]; then
+            RID="linux-x64"
+          else
+            RID="linux-arm64"
+          fi
+          
+          dotnet publish FrameExtractor/FrameExtractor.csproj \
+            -c Release \
+            -r $RID \
+            -p:SelfContained=true \
+            -p:PublishSingleFile=true \
+            -p:IncludeNativeLibrariesForSelfExtract=true \
+            -p:PublishTrimmed=false \
+            -p:DebugType=None \
+            -p:DebugSymbols=false \
+            -o publish/$RID
+
+      - name: Create AppImage structure
+        run: |
+          if [ "${{ matrix.arch }}" == "x86_64" ]; then
+            RID="linux-x64"
+          else
+            RID="linux-arm64"
+          fi
+          
+          # Create AppDir structure
+          mkdir -p AppDir/usr/bin
+          mkdir -p AppDir/usr/share/applications
+          mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
+          mkdir -p AppDir/usr/share/metainfo
+          
+          # Copy application
+          cp publish/$RID/FrameExtractor AppDir/usr/bin/
+          chmod +x AppDir/usr/bin/FrameExtractor
+
+          # Copy icon from repository
+          cp Assets/Icons/FrameExtractor_Icon.png AppDir/usr/share/icons/hicolor/256x256/apps/
+          
+          # Create desktop file
+          cat > AppDir/usr/share/applications/frameextractor.desktop << 'EOF'
+          [Desktop Entry]
+          Type=Application
+          Name=FrameExtractor
+          Comment=Video frame extraction tool
+          Exec=FrameExtractor
+          Icon=FrameExtractor_Icon
+          Categories=AudioVideo;Video;
+          Terminal=false
+          EOF
+          
+          # Create icon (placeholder - replace with actual icon)
+          cat > AppDir/usr/share/icons/hicolor/256x256/apps/FrameExtractor_Icon.png << 'EOF'
+          EOF
+          
+          # Create AppStream metadata
+          cat > AppDir/usr/share/metainfo/frameextractor.appdata.xml << 'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <component type="desktop">
+            <id>com.frameextractor.FrameExtractor</id>
+            <name>FrameExtractor</name>
+            <summary>Video frame extraction tool</summary>
+            <description>
+              <p>Extract frames from video files with FFmpeg integration</p>
+            </description>
+            <launchable type="desktop-id">frameextractor.desktop</launchable>
+            <url type="homepage">https://github.com/nokarin-dev/FrameExtractor</url>
+            <provides>
+              <binary>FrameExtractor</binary>
+            </provides>
+            <releases>
+              <release version="2.0.1" date="2024-12-02"/>
+            </releases>
+          </component>
+          EOF
+          
+          # Create AppRun
+          cat > AppDir/AppRun << 'EOF'
+          #!/bin/bash
+          SELF=$(readlink -f "$0")
+          HERE=${SELF%/*}
+          export PATH="${HERE}/usr/bin:${PATH}"
+          export LD_LIBRARY_PATH="${HERE}/usr/lib:${LD_LIBRARY_PATH}"
+          exec "${HERE}/usr/bin/FrameExtractor" "$@"
+          EOF
+          
+          chmod +x AppDir/AppRun
+          
+          # Create .DirIcon link
+          ln -sf usr/share/icons/hicolor/256x256/apps/FrameExtractor_Icon.png AppDir/.DirIcon
+
+      - name: Build AppImage
+        run: |
+          if [ "${{ matrix.arch }}" == "x86_64" ]; then
+            RID="linux-x64"
+          else
+            RID="linux-arm64"
+          fi
+          
+          # Build AppImage
+          ARCH=${{ matrix.arch }} appimagetool AppDir FrameExtractor-${{ matrix.arch }}.AppImage
+          
+          # Make executable
+          chmod +x FrameExtractor-${{ matrix.arch }}.AppImage
+
+      - name: Upload AppImage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: FrameExtractor-Linux-${{ matrix.arch }}-AppImage
+          path: FrameExtractor-${{ matrix.arch }}.AppImage
+          retention-days: 7
