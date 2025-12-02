@@ -2,9 +2,9 @@ name: Build & Test
 
 on:
   push:
-    branches: ["main", "master"]
+    branches: ["main"]
   pull_request:
-    branches: ["main", "master"]
+    branches: ["main"]
 
 jobs:
   build-windows:
@@ -42,10 +42,22 @@ jobs:
       - name: Restore dependencies
         run: dotnet restore
 
+      - name: Find project file
+        id: find-project
+        run: |
+          $csproj = Get-ChildItem -Recurse -Filter "*.csproj" | Select-Object -First 1
+          if ($null -eq $csproj) {
+            Write-Error "No .csproj file found"
+            exit 1
+          }
+          $projectPath = $csproj.FullName.Replace((Get-Location).Path + "\", "").Replace("\", "/")
+          echo "PROJECT_PATH=$projectPath" >> $env:GITHUB_OUTPUT
+          Write-Host "Found project: $projectPath"
+
       - name: Build with MSVC
         if: matrix.compiler == 'MSVC'
         run: |
-          dotnet build FrameExtractor/FrameExtractor.csproj `
+          dotnet build ${{ steps.find-project.outputs.PROJECT_PATH }} `
             --configuration Release `
             --no-restore `
             -p:RuntimeIdentifier=win-${{ matrix.arch }} `
@@ -54,10 +66,10 @@ jobs:
         if: matrix.compiler == 'MinGW'
         run: |
           $env:PATH = "C:\msys64\mingw64\bin;$env:PATH"
-          dotnet build \
-            --configuration Release \
-            --no-restore \
-            -p:RuntimeIdentifier=win-x64 \
+          dotnet build ${{ steps.find-project.outputs.PROJECT_PATH }} `
+            --configuration Release `
+            --no-restore `
+            -p:RuntimeIdentifier=win-x64 `
             -p:UseMinGW=true
 
       - name: Run tests
@@ -69,7 +81,7 @@ jobs:
           $rid = "win-${{ matrix.arch }}"
           $compiler = "${{ matrix.compiler }}"
           
-          dotnet publish FrameExtractor/FrameExtractor.csproj `
+          dotnet publish ${{ steps.find-project.outputs.PROJECT_PATH }} `
             -c Release `
             -r $rid `
             -p:SelfContained=true `
@@ -93,7 +105,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        arch: [x86_64, aarch64]
+        arch: [x86_64]
 
     steps:
       - name: Checkout repository
@@ -110,26 +122,20 @@ jobs:
           sudo apt-get install -y wget fuse libfuse2
           
           # Download appimagetool
-          wget https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-${{ matrix.arch }}.AppImage
-          chmod +x appimagetool-${{ matrix.arch }}.AppImage
-          sudo mv appimagetool-${{ matrix.arch }}.AppImage /usr/local/bin/appimagetool
+          wget https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x appimagetool-x86_64.AppImage
+          sudo mv appimagetool-x86_64.AppImage /usr/local/bin/appimagetool
 
       - name: Setup cross-compilation for ARM64
         if: matrix.arch == 'aarch64'
         run: |
           sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
-
+          
       - name: Restore dependencies
         run: dotnet restore
 
       - name: Publish
         run: |
-          if [ "${{ matrix.arch }}" == "x86_64" ]; then
-            RID="linux-x64"
-          else
-            RID="linux-arm64"
-          fi
-          
           # Find the .csproj file
           CSPROJ=$(find . -name "*.csproj" -type f | head -n 1)
           
@@ -150,19 +156,13 @@ jobs:
             -p:DebugType=None \
             -p:DebugSymbols=false \
             -o publish/$RID
-
+            
       - name: Create AppImage structure
         run: |
-          if [ "${{ matrix.arch }}" == "x86_64" ]; then
-            RID="linux-x64"
-          else
-            RID="linux-arm64"
-          fi
-          
           # Find executable name
-          EXECUTABLE=$(find publish/$RID -maxdepth 1 -type f -executable | head -n 1)
+          EXECUTABLE=$(find publish/linux-x64 -maxdepth 1 -type f -executable | head -n 1)
           EXECUTABLE_NAME=$(basename "$EXECUTABLE")
-
+          
           # Create AppDir structure
           mkdir -p AppDir/usr/bin
           mkdir -p AppDir/usr/share/applications
@@ -172,26 +172,31 @@ jobs:
           # Copy application
           cp "$EXECUTABLE" AppDir/usr/bin/
           chmod +x AppDir/usr/bin/"$EXECUTABLE_NAME"
-
+          
           # Copy icon from repository (if exists)
           if [ -f "Assets/Icons/FrameExtractor_Icon.png" ]; then
             cp Assets/Icons/FrameExtractor_Icon.png AppDir/usr/share/icons/hicolor/256x256/apps/
+            cp Assets/Icons/FrameExtractor_Icon.png AppDir/
           else
             # Create a placeholder 1x1 PNG if icon doesn't exist
             echo "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==" | base64 -d > AppDir/usr/share/icons/hicolor/256x256/apps/FrameExtractor_Icon.png
+            cp AppDir/usr/share/icons/hicolor/256x256/apps/FrameExtractor_Icon.png AppDir/
           fi
           
           # Create desktop file
-          cat > AppDir/usr/share/applications/frameextractor.desktop << 'EOF'
+          cat > AppDir/FrameExtractor.desktop << 'EOF'
           [Desktop Entry]
           Type=Application
           Name=FrameExtractor
-          Comment=Video frame extraction tool
+          Comment=Efortless video frame extraction
           Exec=FrameExtractor
           Icon=FrameExtractor_Icon
           Categories=AudioVideo;Video;
           Terminal=false
           EOF
+
+          # Copy to proper location
+          cp AppDir/frameextractor.desktop AppDir/usr/share/applications/
           
           # Create AppStream metadata
           cat > AppDir/usr/share/metainfo/frameextractor.appdata.xml << 'EOF'
@@ -199,9 +204,9 @@ jobs:
           <component type="desktop">
             <id>com.frameextractor.FrameExtractor</id>
             <name>FrameExtractor</name>
-            <summary>Video frame extraction tool</summary>
+            <summary>Efortless video frame extraction</summary>
             <description>
-              <p>Extract frames from video files with FFmpeg integration</p>
+              <p>FrameExtractor is a modern, cross-platform video frame extractor with a beautiful GUI built using Avalonia UI and FFmpeg. It lets you extract frames from any video file with precise control over time range, FPS, output format, and naming.</p>
             </description>
             <launchable type="desktop-id">frameextractor.desktop</launchable>
             <url type="homepage">https://github.com/nokarin-dev/FrameExtractor</url>
@@ -209,7 +214,7 @@ jobs:
               <binary>FrameExtractor</binary>
             </provides>
             <releases>
-              <release version="2.0.1" date="2024-12-02"/>
+              <release version="1.0.8-test" date="2025-11-02"/>
             </releases>
           </component>
           EOF
@@ -226,26 +231,73 @@ jobs:
           
           chmod +x AppDir/AppRun
           
-          # Create .DirIcon link
-          ln -sf usr/share/icons/hicolor/256x256/apps/FrameExtractor_Icon.png AppDir/.DirIcon
+          # Debug: List AppDir contents
+          echo "=== AppDir structure ==="
+          ls -la AppDir/
+          echo "=== Desktop file check ==="
+          cat AppDir/frameextractor.desktop
 
       - name: Build AppImage
         run: |
-          if [ "${{ matrix.arch }}" == "x86_64" ]; then
-            RID="linux-x64"
-          else
-            RID="linux-arm64"
-          fi
-          
           # Build AppImage
-          ARCH=${{ matrix.arch }} appimagetool AppDir FrameExtractor-${{ matrix.arch }}.AppImage
+          ARCH=x86_64 appimagetool AppDir FrameExtractor-x86_64.AppImage
           
           # Make executable
-          chmod +x FrameExtractor-${{ matrix.arch }}.AppImage
+          chmod +x FrameExtractor-x86_64.AppImage
 
       - name: Upload AppImage artifact
         uses: actions/upload-artifact@v4
         with:
-          name: FrameExtractor-Linux-${{ matrix.arch }}-AppImage
-          path: FrameExtractor-${{ matrix.arch }}.AppImage
+          name: FrameExtractor-Linux-x86_64-AppImage
+          path: FrameExtractor-x86_64.AppImage
+          retention-days: 7
+
+  build-linux-native:
+    name: Build Linux Native - ${{ matrix.arch }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x64, arm64]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Publish
+        run: |
+          # Find the .csproj file
+          CSPROJ=$(find . -name "*.csproj" -type f | head -n 1)
+          
+          if [ -z "$CSPROJ" ]; then
+            echo "Error: No .csproj file found"
+            exit 1
+          fi
+          
+          echo "Building project: $CSPROJ"
+          
+          dotnet publish "$CSPROJ" \
+            -c Release \
+            -r linux-${{ matrix.arch }} \
+            -p:SelfContained=true \
+            -p:PublishSingleFile=true \
+            -p:IncludeNativeLibrariesForSelfExtract=true \
+            -p:PublishTrimmed=false \
+            -p:DebugType=None \
+            -p:DebugSymbols=false \
+            -o publish/linux-${{ matrix.arch }}
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: FrameExtractor-Linux-${{ matrix.arch }}-Native
+          path: publish/linux-${{ matrix.arch }}/*
           retention-days: 7
