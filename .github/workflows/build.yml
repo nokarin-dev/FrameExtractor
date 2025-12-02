@@ -233,12 +233,6 @@ jobs:
           EOF
           
           chmod +x AppDir/AppRun
-          
-          # Debug: List AppDir contents
-          echo "=== AppDir structure ==="
-          ls -la AppDir/
-          echo "=== Desktop file check ==="
-          cat AppDir/frameextractor.desktop
 
       - name: Build AppImage
         run: |
