@@ -45,17 +45,15 @@ jobs:
       - name: Build with MSVC
         if: matrix.compiler == 'MSVC'
         run: |
-          dotnet build `
+          dotnet build FrameExtractor/FrameExtractor.csproj `
             --configuration Release `
             --no-restore `
             -p:RuntimeIdentifier=win-${{ matrix.arch }} `
-            -p:PlatformTarget=${{ matrix.arch }}
 
       - name: Build with MinGW
         if: matrix.compiler == 'MinGW'
-        shell: msys2 {0}
         run: |
-          export PATH="/mingw64/bin:$PATH"
+          $env:PATH = "C:\msys64\mingw64\bin;$env:PATH"
           dotnet build \
             --configuration Release \
             --no-restore \
@@ -132,7 +130,17 @@ jobs:
             RID="linux-arm64"
           fi
           
-          dotnet publish FrameExtractor/FrameExtractor.csproj \
+          # Find the .csproj file
+          CSPROJ=$(find . -name "*.csproj" -type f | head -n 1)
+          
+          if [ -z "$CSPROJ" ]; then
+            echo "Error: No .csproj file found"
+            exit 1
+          fi
+          
+          echo "Building project: $CSPROJ"
+          
+          dotnet publish "$CSPROJ" \
             -c Release \
             -r $RID \
             -p:SelfContained=true \
@@ -151,6 +159,10 @@ jobs:
             RID="linux-arm64"
           fi
           
+          # Find executable name
+          EXECUTABLE=$(find publish/$RID -maxdepth 1 -type f -executable | head -n 1)
+          EXECUTABLE_NAME=$(basename "$EXECUTABLE")
+
           # Create AppDir structure
           mkdir -p AppDir/usr/bin
           mkdir -p AppDir/usr/share/applications
@@ -158,11 +170,16 @@ jobs:
           mkdir -p AppDir/usr/share/metainfo
           
           # Copy application
-          cp publish/$RID/FrameExtractor AppDir/usr/bin/
-          chmod +x AppDir/usr/bin/FrameExtractor
+          cp "$EXECUTABLE" AppDir/usr/bin/
+          chmod +x AppDir/usr/bin/"$EXECUTABLE_NAME"
 
-          # Copy icon from repository
-          cp Assets/Icons/FrameExtractor_Icon.png AppDir/usr/share/icons/hicolor/256x256/apps/
+          # Copy icon from repository (if exists)
+          if [ -f "Assets/Icons/FrameExtractor_Icon.png" ]; then
+            cp Assets/Icons/FrameExtractor_Icon.png AppDir/usr/share/icons/hicolor/256x256/apps/
+          else
+            # Create a placeholder 1x1 PNG if icon doesn't exist
+            echo "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==" | base64 -d > AppDir/usr/share/icons/hicolor/256x256/apps/FrameExtractor_Icon.png
+          fi
           
           # Create desktop file
           cat > AppDir/usr/share/applications/frameextractor.desktop << 'EOF'
@@ -174,10 +191,6 @@ jobs:
           Icon=FrameExtractor_Icon
           Categories=AudioVideo;Video;
           Terminal=false
-          EOF
-          
-          # Create icon (placeholder - replace with actual icon)
-          cat > AppDir/usr/share/icons/hicolor/256x256/apps/FrameExtractor_Icon.png << 'EOF'
           EOF
           
           # Create AppStream metadata
