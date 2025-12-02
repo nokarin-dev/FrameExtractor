@@ -199,19 +199,19 @@ jobs:
           EOF
 
           # Copy to proper location
-          cp AppDir/frameextractor.desktop AppDir/usr/share/applications/
+          cp AppDir/FrameExtractor.desktop AppDir/usr/share/applications/
           
           # Create AppStream metadata
           cat > AppDir/usr/share/metainfo/frameextractor.appdata.xml << 'EOF'
           <?xml version="1.0" encoding="UTF-8"?>
           <component type="desktop">
-            <id>com.frameextractor.FrameExtractor</id>
+            <id>com.nokarin.FrameExtractor</id>
             <name>FrameExtractor</name>
             <summary>Efortless video frame extraction</summary>
             <description>
               <p>FrameExtractor is a modern, cross-platform video frame extractor with a beautiful GUI built using Avalonia UI and FFmpeg. It lets you extract frames from any video file with precise control over time range, FPS, output format, and naming.</p>
             </description>
-            <launchable type="desktop-id">frameextractor.desktop</launchable>
+            <launchable type="desktop-id">FrameExtractor.desktop</launchable>
             <url type="homepage">https://github.com/nokarin-dev/FrameExtractor</url>
             <provides>
               <binary>FrameExtractor</binary>
