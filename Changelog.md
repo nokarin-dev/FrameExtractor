@@ -1,10 +1,21 @@
-# 📦 Changelog
+# Changelog
 
 All notable changes to this project will be documented in this file.
 
 The format is based on [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
+
+## [v1.0.7] - 30/11/2025
+
+### Added
+- RoundedWindowHelper class
+- Semi theme and related styles to App.axaml for improved UI.
+
+### Improvements
+- Updated MainWindow and various dialog views to support rounded corners.
+- Refactored window initialization to use RoundedWindowHelper for consistent styling across platforms.
+- Enhanced logging and error dialogs for better user experience.
 
 ## [v1.0.6] - 09/08/2025
 ### Added

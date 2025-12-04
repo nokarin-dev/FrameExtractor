@@ -1,0 +1,103 @@
+name: Build (Windows)
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  build-windows:
+    name: Build Windows - ${{ matrix.arch }} (${{ matrix.compiler }})
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x64, ARM64]
+        compiler: [MSVC, MinGW]
+        exclude:
+          # MinGW doesn't support ARM64
+          - arch: ARM64
+            compiler: MinGW
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Setup MinGW (x64 only)
+        if: matrix.compiler == 'MinGW'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-make
+
+      - name: Find project file
+        id: find-project
+        run: |
+          $csproj = Get-ChildItem -Recurse -Filter "*.csproj" | Select-Object -First 1
+          if ($null -eq $csproj) {
+            Write-Error "No .csproj file found"
+            exit 1
+          }
+          $projectPath = $csproj.FullName.Replace((Get-Location).Path + "\", "").Replace("\", "/")
+          echo "PROJECT_PATH=$projectPath" >> $env:GITHUB_OUTPUT
+          Write-Host "Found project: $projectPath"
+
+      - name: Restore dependencies
+        run: |
+          $rid = "win-${{ matrix.arch }}".ToLower()
+          dotnet restore ${{ steps.find-project.outputs.PROJECT_PATH }} -r $rid
+
+      - name: Build with MSVC
+        if: matrix.compiler == 'MSVC'
+        run: |
+          $rid = "win-${{ matrix.arch }}".ToLower()
+          dotnet build ${{ steps.find-project.outputs.PROJECT_PATH }} `
+            --configuration Release `
+            --no-restore `
+            -r $rid
+
+      - name: Build with MinGW
+        if: matrix.compiler == 'MinGW'
+        run: |
+          $env:PATH = "C:\msys64\mingw64\bin;$env:PATH"
+          dotnet build ${{ steps.find-project.outputs.PROJECT_PATH }} `
+            --configuration Release `
+            --no-restore `
+            -r win-x64 `
+            -p:UseMinGW=true
+
+      - name: Run tests
+        run: dotnet test --no-build --verbosity normal --configuration Release
+        continue-on-error: true
+
+      - name: Publish
+        run: |
+          $rid = "win-${{ matrix.arch }}".ToLower()
+          $compiler = "${{ matrix.compiler }}"
+          
+          dotnet publish ${{ steps.find-project.outputs.PROJECT_PATH }} `
+            -c Release `
+            -r $rid `
+            -p:SelfContained=true `
+            -p:PublishSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=true `
+            -p:PublishTrimmed=false `
+            -p:DebugType=None `
+            -p:DebugSymbols=false `
+            -o artifacts/$compiler-$rid
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: FrameExtractor-Windows-${{ matrix.arch }}-${{ matrix.compiler }}
+          path: artifacts/${{ matrix.compiler }}-win-${{ matrix.arch }}/*
+          retention-days: 7

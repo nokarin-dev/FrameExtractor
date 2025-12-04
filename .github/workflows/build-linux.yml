@@ -1,0 +1,235 @@
+name: Build (Linux)
+
+on:
+    push:
+        branches: ["main"]
+    pull_request:
+        branches: ["main"]
+
+jobs:
+    build-linux-appimage:
+        name: Build Linux AppImage - ${{ matrix.arch }}
+        runs-on: ubuntu-latest
+        strategy:
+            fail-fast: false
+            matrix:
+                arch: [x86_64]
+
+        steps:
+            -   name: Checkout repository
+                uses: actions/checkout@v4
+
+            -   name: Setup .NET SDK
+                uses: actions/setup-dotnet@v4
+                with:
+                    dotnet-version: '8.0.x'
+
+            -   name: Install AppImage tools
+                run: |
+                    sudo apt-get update
+                    sudo apt-get install -y wget fuse libfuse2 file
+
+                    # Download appimagetool
+                    wget https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+                    chmod +x appimagetool-x86_64.AppImage
+                    sudo mv appimagetool-x86_64.AppImage /usr/local/bin/appimagetool
+
+            -   name: Restore dependencies
+                run: dotnet restore
+
+            -   name: Publish
+                run: |
+                    # Find the .csproj file
+                    CSPROJ=$(find . -name "*.csproj" -type f | head -n 1)
+
+                    if [ -z "$CSPROJ" ]; then
+                    echo "Error: No .csproj file found"
+                        exit 1
+                    fi
+
+                    echo "Building project: $CSPROJ"
+
+                    dotnet publish "$CSPROJ" \
+                        -c Release \
+                        -r linux-x64 \
+                        -p:SelfContained=true \
+                        -p:PublishSingleFile=true \
+                        -p:IncludeNativeLibrariesForSelfExtract=true \
+                        -p:PublishTrimmed=false \
+                        -p:DebugType=None \
+                        -p:DebugSymbols=false \
+                        -o publish/linux-x64
+            
+            -   name: Create AppImage structure
+                run: |
+                    # Find executable name
+                    EXECUTABLE=$(find publish/linux-x64 -maxdepth 1 -type f -executable | head -n 1)
+                    EXECUTABLE_NAME=$(basename "$EXECUTABLE")
+
+                    # Create AppDir structure
+                    mkdir -p AppDir/usr/bin
+                    mkdir -p AppDir/usr/share/applications
+                    mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
+                    mkdir -p AppDir/usr/share/metainfo
+
+                    # Copy application
+                    cp "$EXECUTABLE" AppDir/usr/bin/
+                    chmod +x AppDir/usr/bin/"$EXECUTABLE_NAME"
+
+                    # Copy icon from repository (if exists)
+                    if [ -f "Assets/Icons/FrameExtractor_Icon.png" ]; then
+                        cp Assets/Icons/FrameExtractor_Icon.png AppDir/usr/share/icons/hicolor/256x256/apps/
+                        cp Assets/Icons/FrameExtractor_Icon.png AppDir/
+                    else
+                        # Create a placeholder 1x1 PNG if icon doesn't exist
+                        echo "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==" | base64 -d > AppDir/usr/share/icons/hicolor/256x256/apps/FrameExtractor_Icon.png
+                        cp AppDir/usr/share/icons/hicolor/256x256/apps/FrameExtractor_Icon.png AppDir/
+                    fi
+
+                    # Create desktop file
+                    cat > AppDir/FrameExtractor.desktop << 'EOF'
+                    [Desktop Entry]
+                    Type=Application
+                    Name=FrameExtractor
+                    Comment=Efortless video frame extraction
+                    Exec=FrameExtractor
+                    Icon=FrameExtractor_Icon
+                    Categories=AudioVideo;Video;
+                    Terminal=false
+                    EOF
+
+                    # Copy to proper location
+                    cp AppDir/FrameExtractor.desktop AppDir/usr/share/applications/
+
+                    # Create AppStream metadata
+                    cat > AppDir/usr/share/metainfo/FrameExtractor.appdata.xml << 'EOF'
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <component type="desktop">
+                        <id>com.nokarin.FrameExtractor</id>
+                        <name>FrameExtractor</name>
+                        <summary>Efortless video frame extraction.</summary>
+                        <description>
+                            <p>
+                                FrameExtractor is a modern, cross-platform video frame extractor with a beautiful GUI built using Avalonia UI and FFmpeg.
+                                It lets you extract frames from any video file with precise control over time range, FPS, output format, and naming.
+                            </p>
+                        </description>
+                        <launchable type="desktop-id">FrameExtractor.desktop</launchable>
+                        <url type="homepage">https://github.com/nokarin-dev/FrameExtractor</url>
+                        <provides>
+                            <binary>FrameExtractor</binary>
+                        </provides>
+                        <releases>
+                            <release version="1.0.0-test" date="1945-08-17"/>
+                        </releases>
+                    </component>
+                    EOF
+
+                    # Create AppRun
+                    cat > AppDir/AppRun << 'EOF'
+                    #!/bin/bash
+                    SELF=$(readlink -f "$0")
+                    HERE=${SELF%/*}
+                    export PATH="${HERE}/usr/bin:${PATH}"
+                    export LD_LIBRARY_PATH="${HERE}/usr/lib:${LD_LIBRARY_PATH}"
+                    exec "${HERE}/usr/bin/FrameExtractor" "$@"
+                    EOF
+
+                    chmod +x AppDir/AppRun
+
+            -   name: Build AppImage
+                run: |
+                    # Build AppImage
+                    ARCH=x86_64 appimagetool --no-appstream AppDir FrameExtractor-x86_64.AppImage
+
+                    # Make executable
+                    chmod +x FrameExtractor-x86_64.AppImage
+
+                    # Verify
+                    ls -lh FrameExtractor-x86_64.AppImage
+                    file FrameExtractor-x86_64.AppImage
+
+            -   name: Create portable tarball
+                run: |
+                    # Create a simple tarball for systems without FUSE
+                    mkdir -p FrameExtractor-Linux-x86_64-Portable
+                    cp -r AppDir/usr/bin/* FrameExtractor-Linux-x86_64-Portable/
+
+                    # Create launch script
+                    cat > FrameExtractor-Linux-x86_64-Portable/FrameExtractor.sh << 'EOF'
+                    #!/bin/bash
+                    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+                    cd "$SCRIPT_DIR"
+                    exec ./FrameExtractor "$@"
+                    EOF
+
+                    chmod +x FrameExtractor-Linux-x86_64-Portable/FrameExtractor.sh
+
+                    # Create tarball
+                    tar -czf FrameExtractor-Linux-x86_64-Portable.tar.gz FrameExtractor-Linux-x86_64-Portable/
+
+                    ls -lh FrameExtractor-Linux-x86_64-Portable.tar.gz
+
+            -   name: Upload AppImage artifact
+                uses: actions/upload-artifact@v4
+                with:
+                    name: FrameExtractor-Linux-x86_64-AppImage
+                    path: FrameExtractor-x86_64.AppImage
+                    retention-days: 7
+
+            -   name: Upload Portable tarball artifact
+                uses: actions/upload-artifact@v4
+                with:
+                    name: FrameExtractor-Linux-x86_64-Portable
+                    path: FrameExtractor-Linux-x86_64-Portable.tar.gz
+                    retention-days: 7
+
+    build-linux-native:
+        name: Build Linux Native - ${{ matrix.arch }}
+        runs-on: ubuntu-latest
+        strategy:
+            fail-fast: false
+            matrix:
+                arch: [x64, arm64]
+
+        steps:
+            -   name: Checkout repository
+                uses: actions/checkout@v4
+
+            -   name: Setup .NET SDK
+                uses: actions/setup-dotnet@v4
+                with:
+                    dotnet-version: '8.0.x'
+
+            -   name: Restore dependencies
+                run: dotnet restore
+
+            -   name: Publish
+                run: |
+                    # Find the .csproj file
+                    CSPROJ=$(find . -name "*.csproj" -type f | head -n 1)
+
+                    if [ -z "$CSPROJ" ]; then
+                        echo "Error: No .csproj file found"
+                        exit 1
+                    fi
+
+                    echo "Building project: $CSPROJ"
+
+                    dotnet publish "$CSPROJ" \
+                        -c Release \
+                        -r linux-${{ matrix.arch }} \
+                        -p:SelfContained=true \
+                        -p:PublishSingleFile=true \
+                        -p:IncludeNativeLibrariesForSelfExtract=true \
+                        -p:PublishTrimmed=false \
+                        -p:DebugType=None \
+                        -p:DebugSymbols=false \
+                        -o publish/linux-${{ matrix.arch }}
+
+            -   name: Upload build artifacts
+                uses: actions/upload-artifact@v4
+                with:
+                    name: FrameExtractor-Linux-${{ matrix.arch }}-Native
+                    path: publish/linux-${{ matrix.arch }}/*
+                    retention-days: 7
