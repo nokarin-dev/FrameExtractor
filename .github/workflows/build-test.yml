@@ -249,36 +249,51 @@ jobs:
 
       - name: Set iOS minimum deployment target
         run: |
-          PODFILE="ios/Podfile"
-          if [ -f "$PODFILE" ]; then
-            if grep -q "^platform :ios" "$PODFILE"; then
-              sed -i '' "s/^platform :ios.*/platform :ios, '13.0'/" "$PODFILE"
-            else
-              sed -i '' "1a\
-              platform :ios, '13.0'" "$PODFILE"
-            fi
-              if ! grep -q "IPHONEOS_DEPLOYMENT_TARGET" "$PODFILE"; then
-                cat >> "$PODFILE" << 'RUBY'
-  
-                post_install do |installer|
-                installer.pods_project.targets.each do |target|
-                target.build_configurations.each do |config|
+          python3 - << 'PYEOF'
+          import re, os
+          
+          pbxproj = "ios/Runner.xcodeproj/project.pbxproj"
+          if os.path.exists(pbxproj):
+              content = open(pbxproj).read()
+              patched = re.sub(
+                  r'IPHONEOS_DEPLOYMENT_TARGET = [\d.]+',
+                  'IPHONEOS_DEPLOYMENT_TARGET = 13.0',
+                  content
+              )
+              open(pbxproj, 'w').write(patched)
+              print("✓ Patched Runner.xcodeproj deployment target to 13.0")
+          else:
+              print("⚠ Runner.xcodeproj not found — skipping")
+          
+          podfile = "ios/Podfile"
+          if os.path.exists(podfile):
+              content = open(podfile).read()
+          
+              if re.search(r"^platform :ios", content, re.MULTILINE):
+                  content = re.sub(
+                      r"^platform :ios.*",
+                      "platform :ios, '13.0'",
+                      content, flags=re.MULTILINE
+                  )
+              else:
+                  content = "platform :ios, '13.0'\n" + content
+          
+              if 'IPHONEOS_DEPLOYMENT_TARGET' not in content:
+                  content += """
+          post_install do |installer|
+            installer.pods_project.targets.each do |target|
+              flutter_additional_ios_build_settings(target)
+              target.build_configurations.each do |config|
                 config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
               end
             end
           end
-          RUBY
-          fi
-            echo "✓ Podfile patched:"
-            grep -E "platform|IPHONEOS" "$PODFILE" | head -5
-          else
-            echo "Podfile not found — will be created by flutter build"
-          fi
-          PBXPROJ="ios/Runner.xcodeproj/project.pbxproj"
-          if [ -f "$PBXPROJ" ]; then
-            sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = [0-9.]*/IPHONEOS_DEPLOYMENT_TARGET = 13.0/g' "$PBXPROJ"
-            echo "✓ Xcode project deployment target set to 13.0"
-          fi
+          """
+              open(podfile, 'w').write(content)
+              print("✓ Patched Podfile platform to ios 13.0")
+          else:
+              print("⚠ Podfile not found — Flutter will generate it during build")
+          PYEOF
 
       - name: Build iOS
         run: |
