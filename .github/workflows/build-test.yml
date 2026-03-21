@@ -23,7 +23,6 @@ permissions:
 
 jobs:
 
-  # Dart analysis & unit test
   analyze:
     name: Analyze & Test
     runs-on: ubuntu-latest
@@ -51,18 +50,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - name: Create dummy binary placeholders
         run: |
           mkdir -p assets/binaries/android/arm64-v8a
           mkdir -p assets/binaries/android/armeabi-v7a
           mkdir -p assets/binaries/android/x86_64
-
           printf '\x7fELF' > assets/binaries/android/arm64-v8a/yt-dlp
           printf '\x7fELF' > assets/binaries/android/armeabi-v7a/yt-dlp
           printf '\x7fELF' > assets/binaries/android/x86_64/yt-dlp
-
-          echo "Dummy binaries created:"
           find assets/binaries -type f | sort
 
       - uses: actions/upload-artifact@v4
@@ -71,7 +66,6 @@ jobs:
           path: assets/binaries
           retention-days: 1
 
-  # Linux build test
   test-linux:
     name: Build Test — Linux
     needs: [analyze, prepare-dummy-binaries]
@@ -97,25 +91,20 @@ jobs:
           flutter-version: '3.x'
           channel: stable
           cache: true
-
-      - name: Install dependencies
-        run: flutter pub get
+      - run: flutter pub get
 
       - name: Build Linux (debug)
         run: flutter build linux --debug --dart-define=PORTABLE=false
 
-      - name: Verify build output exists
+      - name: Verify build output
         run: |
           EXE=$(find build/linux/x64/debug/bundle -maxdepth 1 -type f ! -name "*.so" | head -1)
           if [ -n "$EXE" ]; then
-            echo "✓ Linux debug build OK — $EXE ($(du -h "$EXE" | cut -f1))"
+            echo "✓ Linux OK — $EXE"
           else
-            echo "✗ No executable found in bundle"
-            ls -la build/linux/x64/debug/bundle/
-            exit 1
+            ls -la build/linux/x64/debug/bundle/ && exit 1
           fi
 
-  # Windows build test
   test-windows:
     name: Build Test — Windows
     needs: [analyze, prepare-dummy-binaries]
@@ -134,25 +123,21 @@ jobs:
           flutter-version: '3.x'
           channel: stable
           cache: true
-
-      - name: Install dependencies
-        run: flutter pub get
+      - run: flutter pub get
 
       - name: Build Windows (debug)
         run: flutter build windows --debug --dart-define=PORTABLE=false
 
-      - name: Verify build output exists
+      - name: Verify build output
         shell: pwsh
         run: |
           $exe = "build\windows\x64\runner\Debug\frameextractor.exe"
           if (Test-Path $exe) {
-            Write-Host "✓ Windows debug build OK — $((Get-Item $exe).Length) bytes"
+            Write-Host "✓ Windows OK"
           } else {
-            Write-Error "✗ Executable not found: $exe"
-            exit 1
+            Write-Error "✗ Not found: $exe"; exit 1
           }
 
-  # macOS build test
   test-macos:
     name: Build Test — macOS
     needs: [analyze, prepare-dummy-binaries]
@@ -171,25 +156,16 @@ jobs:
           flutter-version: '3.x'
           channel: stable
           cache: true
-
-      - name: Install dependencies
-        run: flutter pub get
+      - run: flutter pub get
 
       - name: Build macOS (debug)
         run: flutter build macos --debug --dart-define=PORTABLE=false
 
-      - name: Verify build output exists
+      - name: Verify build output
         run: |
           APP="build/macos/Build/Products/Debug/frameextractor.app"
-          if [ -d "$APP" ]; then
-            echo "✓ macOS debug build OK"
-            du -sh "$APP"
-          else
-            echo "✗ App bundle not found: $APP"
-            exit 1
-          fi
+          [ -d "$APP" ] && echo "✓ macOS OK" || (echo "✗ Not found: $APP" && exit 1)
 
-  # Android build test
   test-android:
     name: Build Test — Android
     needs: [analyze, prepare-dummy-binaries]
@@ -213,9 +189,7 @@ jobs:
           flutter-version: '3.x'
           channel: stable
           cache: true
-
-      - name: Install dependencies
-        run: flutter pub get
+      - run: flutter pub get
 
       - name: Build Android APK (debug)
         run: flutter build apk --debug --dart-define=PORTABLE=false
@@ -223,14 +197,8 @@ jobs:
       - name: Verify APK exists
         run: |
           APK="build/app/outputs/flutter-apk/app-debug.apk"
-          if [ -f "$APK" ]; then
-            echo "✓ Android debug APK OK — $(du -h "$APK" | cut -f1)"
-          else
-            echo "✗ APK not found: $APK"
-            exit 1
-          fi
+          [ -f "$APK" ] && echo "✓ Android OK — $(du -h $APK | cut -f1)" || (echo "✗ APK not found" && exit 1)
 
-  # iOS build test
   test-ios:
     name: Build Test — iOS
     needs: analyze
@@ -243,57 +211,47 @@ jobs:
           flutter-version: '3.x'
           channel: stable
           cache: true
+      - run: flutter pub get
 
-      - name: Install dependencies
-        run: flutter pub get
-
-      - name: Set iOS minimum deployment target
+      - name: Patch iOS deployment target
         run: |
-          python3 - << 'PYEOF'
+          cat > /tmp/patch_ios.py << 'EOF'
           import re, os
-          
-          pbxproj = "ios/Runner.xcodeproj/project.pbxproj"
-          if os.path.exists(pbxproj):
-              content = open(pbxproj).read()
-              patched = re.sub(
-                  r'IPHONEOS_DEPLOYMENT_TARGET = [\d.]+',
-                  'IPHONEOS_DEPLOYMENT_TARGET = 13.0',
-                  content
-              )
-              open(pbxproj, 'w').write(patched)
-              print("✓ Patched Runner.xcodeproj deployment target to 13.0")
+
+          pbx = "ios/Runner.xcodeproj/project.pbxproj"
+          if os.path.exists(pbx):
+              t = open(pbx).read()
+              t = re.sub(r"IPHONEOS_DEPLOYMENT_TARGET = [0-9.]+",
+                         "IPHONEOS_DEPLOYMENT_TARGET = 13.0", t)
+              open(pbx, "w").write(t)
+              print("patched xcodeproj")
+
+          pf = "ios/Podfile"
+          if not os.path.exists(pf):
+              print("no Podfile yet")
           else:
-              print("⚠ Runner.xcodeproj not found — skipping")
-          
-          podfile = "ios/Podfile"
-          if os.path.exists(podfile):
-              content = open(podfile).read()
-          
-              if re.search(r"^platform :ios", content, re.MULTILINE):
-                  content = re.sub(
-                      r"^platform :ios.*",
-                      "platform :ios, '13.0'",
-                      content, flags=re.MULTILINE
-                  )
+              t = open(pf).read()
+              if re.search(r"^platform :ios", t, re.MULTILINE):
+                  t = re.sub(r"^platform :ios.*", "platform :ios, '13.0'",
+                             t, flags=re.MULTILINE)
               else:
-                  content = "platform :ios, '13.0'\n" + content
-          
-              if 'IPHONEOS_DEPLOYMENT_TARGET' not in content:
-                  content += """
-          post_install do |installer|
-            installer.pods_project.targets.each do |target|
-              flutter_additional_ios_build_settings(target)
-              target.build_configurations.each do |config|
-                config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
-              end
-            end
-          end
-          """
-              open(podfile, 'w').write(content)
-              print("✓ Patched Podfile platform to ios 13.0")
-          else:
-              print("⚠ Podfile not found — Flutter will generate it during build")
-          PYEOF
+                  t = "platform :ios, '13.0'\n" + t
+              if "IPHONEOS_DEPLOYMENT_TARGET" in t:
+                  t = re.sub(
+                      r"(build_settings\[.IPHONEOS_DEPLOYMENT_TARGET.\]\s*=\s*)['\"][0-9.]+['\"]",
+                      r"\g<1>'13.0'", t)
+              elif "post_install" in t:
+                  inject = ("\n        target.build_configurations.each do |config|\n"
+                            "          config.build_settings"
+                            "['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'\n"
+                            "        end")
+                  t = re.sub(
+                      r"(flutter_additional_ios_build_settings\(target\))",
+                      r"\1" + inject, t, count=1)
+              open(pf, "w").write(t)
+              print("patched Podfile")
+          EOF
+          python3 /tmp/patch_ios.py
 
       - name: Build iOS
         run: |
@@ -305,12 +263,7 @@ jobs:
       - name: Verify .app bundle exists
         run: |
           APP=$(find build/ios -name "*.app" -maxdepth 4 | head -1)
-          if [ -n "$APP" ]; then
-            echo "✓ iOS debug build OK — $APP"
-          else
-            echo "✗ No .app bundle found"
-            exit 1
-          fi
+          [ -n "$APP" ] && echo "✓ iOS OK — $APP" || (echo "✗ no .app found" && exit 1)
 
   all-tests-pass:
     name: All build tests passed
@@ -320,20 +273,19 @@ jobs:
     steps:
       - name: Check all jobs
         run: |
-          echo "analyze: ${{ needs.analyze.result }}"
-          echo "test-linux: ${{ needs.test-linux.result }}"
+          echo "analyze:      ${{ needs.analyze.result }}"
+          echo "test-linux:   ${{ needs.test-linux.result }}"
           echo "test-windows: ${{ needs.test-windows.result }}"
-          echo "test-macos: ${{ needs.test-macos.result }}"
+          echo "test-macos:   ${{ needs.test-macos.result }}"
           echo "test-android: ${{ needs.test-android.result }}"
-          echo "test-ios: ${{ needs.test-ios.result }}"
-
+          echo "test-ios:     ${{ needs.test-ios.result }}"
           if [[ \
-            "${{ needs.analyze.result }}" == "success" && \
-            "${{ needs.test-linux.result }}" == "success" && \
+            "${{ needs.analyze.result }}"      == "success" && \
+            "${{ needs.test-linux.result }}"   == "success" && \
             "${{ needs.test-windows.result }}" == "success" && \
-            "${{ needs.test-macos.result }}" == "success" && \
+            "${{ needs.test-macos.result }}"   == "success" && \
             "${{ needs.test-android.result }}" == "success" && \
-            "${{ needs.test-ios.result }}" == "success" \
+            "${{ needs.test-ios.result }}"     == "success" \
           ]]; then
             echo "✅ All build tests passed."
           else
