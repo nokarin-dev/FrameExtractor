@@ -362,12 +362,20 @@ jobs:
 
       - name: Generate changelog
         run: |
-          PREV_TAG=$(git tag --sort=-version:refname | sed -n '2p')
-          if [ -z "$PREV_TAG" ]; then
-            LOG=$(git log --oneline --no-decorate | head -20)
-          else
-            LOG=$(git log --oneline --no-decorate ${PREV_TAG}..HEAD)
+          VERSION="${{ github.ref_name }}"
+          VERSION_BARE="${VERSION#v}"
+          
+          SECTION=$(awk             "/^## \[$VERSION_BARE\]/{found=1; next} found && /^## \[/{exit} found{print}"             CHANGELOG.md)
+          
+          if [ -z "$SECTION" ]; then
+            PREV_TAG=$(git tag --sort=-version:refname | sed -n '2p')
+            if [ -z "$PREV_TAG" ]; then
+              SECTION=$(git log --oneline --no-decorate | head -20)
+            else
+              SECTION=$(git log --oneline --no-decorate ${PREV_TAG}..HEAD)
+            fi
           fi
+          
           echo "CHANGELOG<<EOF" >> $GITHUB_ENV
           echo "$LOG" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
@@ -377,7 +385,6 @@ jobs:
         with:
           name: "Frame Extractor ${{ github.ref_name }}"
           body: |
-            ## What's changed
             ${{ env.CHANGELOG }}
 
             ---

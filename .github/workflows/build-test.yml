@@ -1,0 +1,288 @@
+name: Build Test
+
+on:
+  push:
+    branches:
+      - flutter
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
+      - 'LICENSE'
+  pull_request:
+    branches:
+      - flutter
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
+      - 'LICENSE'
+
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+
+jobs:
+
+  # Dart analysis & unit test
+  analyze:
+    name: Analyze & Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.22.x'
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Dart analyze
+        run: flutter analyze --no-fatal-infos
+
+      - name: Run unit tests
+        run: flutter test --reporter=github
+        continue-on-error: true
+
+  prepare-dummy-binaries:
+    name: Prepare dummy binaries
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create dummy binary placeholders
+        run: |
+          mkdir -p assets/binaries/android/arm64-v8a
+          mkdir -p assets/binaries/android/armeabi-v7a
+          mkdir -p assets/binaries/android/x86_64
+
+          printf '\x7fELF' > assets/binaries/android/arm64-v8a/yt-dlp
+          printf '\x7fELF' > assets/binaries/android/armeabi-v7a/yt-dlp
+          printf '\x7fELF' > assets/binaries/android/x86_64/yt-dlp
+
+          echo "Dummy binaries created:"
+          find assets/binaries -type f | sort
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dummy-binaries
+          path: assets/binaries
+          retention-days: 1
+
+  # Linux build test
+  test-linux:
+    name: Build Test — Linux
+    needs: [analyze, prepare-dummy-binaries]
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Flutter system dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y \
+            clang cmake ninja-build pkg-config \
+            libgtk-3-dev liblzma-dev libstdc++-12-dev
+
+      - name: Download dummy binaries
+        uses: actions/download-artifact@v4
+        with:
+          name: dummy-binaries
+          path: assets/binaries
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.22.x'
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build Linux
+        run: flutter build linux --debug --dart-define=PORTABLE=false
+
+      - name: Verify build output exists
+        run: |
+          ls -lh build/linux/x64/debug/bundle/frameextractor
+          echo "✓ Linux debug build OK"
+
+  # Windows build test
+  test-windows:
+    name: Build Test — Windows
+    needs: [analyze, prepare-dummy-binaries]
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download dummy binaries
+        uses: actions/download-artifact@v4
+        with:
+          name: dummy-binaries
+          path: assets/binaries
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.22.x'
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build Windows (debug)
+        run: flutter build windows --debug --dart-define=PORTABLE=false
+
+      - name: Verify build output exists
+        shell: pwsh
+        run: |
+          $exe = "build\windows\x64\runner\Debug\frameextractor.exe"
+          if (Test-Path $exe) {
+            Write-Host "✓ Windows debug build OK — $((Get-Item $exe).Length) bytes"
+          } else {
+            Write-Error "✗ Executable not found: $exe"
+            exit 1
+          }
+
+  # macOS build test
+  test-macos:
+    name: Build Test — macOS
+    needs: [analyze, prepare-dummy-binaries]
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download dummy binaries
+        uses: actions/download-artifact@v4
+        with:
+          name: dummy-binaries
+          path: assets/binaries
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.22.x'
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build macOS (debug)
+        run: flutter build macos --debug --dart-define=PORTABLE=false
+
+      - name: Verify build output exists
+        run: |
+          APP="build/macos/Build/Products/Debug/frameextractor.app"
+          if [ -d "$APP" ]; then
+            echo "✓ macOS debug build OK"
+            du -sh "$APP"
+          else
+            echo "✗ App bundle not found: $APP"
+            exit 1
+          fi
+
+  # Android build test
+  test-android:
+    name: Build Test — Android
+    needs: [analyze, prepare-dummy-binaries]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download dummy binaries
+        uses: actions/download-artifact@v4
+        with:
+          name: dummy-binaries
+          path: assets/binaries
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.22.x'
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build Android APK (debug)
+        run: flutter build apk --debug --dart-define=PORTABLE=false
+
+      - name: Verify APK exists
+        run: |
+          APK="build/app/outputs/flutter-apk/app-debug.apk"
+          if [ -f "$APK" ]; then
+            echo "✓ Android debug APK OK — $(du -h "$APK" | cut -f1)"
+          else
+            echo "✗ APK not found: $APK"
+            exit 1
+          fi
+
+  # iOS build test
+  test-ios:
+    name: Build Test — iOS
+    needs: analyze
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.22.x'
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build iOS (no-codesign — compile check only)
+        run: |
+          flutter build ios \
+            --debug \
+            --no-codesign \
+            --dart-define=PORTABLE=false
+
+      - name: Verify .app bundle exists
+        run: |
+          APP=$(find build/ios -name "*.app" -maxdepth 4 | head -1)
+          if [ -n "$APP" ]; then
+            echo "✓ iOS debug build OK — $APP"
+          else
+            echo "✗ No .app bundle found"
+            exit 1
+          fi
+
+  all-tests-pass:
+    name: All build tests passed
+    needs: [analyze, test-linux, test-windows, test-macos, test-android, test-ios]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Check all jobs
+        run: |
+          echo "analyze: ${{ needs.analyze.result }}"
+          echo "test-linux: ${{ needs.test-linux.result }}"
+          echo "test-windows: ${{ needs.test-windows.result }}"
+          echo "test-macos: ${{ needs.test-macos.result }}"
+          echo "test-android: ${{ needs.test-android.result }}"
+          echo "test-ios: ${{ needs.test-ios.result }}"
+
+          if [[ \
+            "${{ needs.analyze.result }}" == "success" && \
+            "${{ needs.test-linux.result }}" == "success" && \
+            "${{ needs.test-windows.result }}" == "success" && \
+            "${{ needs.test-macos.result }}" == "success" && \
+            "${{ needs.test-android.result }}" == "success" && \
+            "${{ needs.test-ios.result }}" == "success" \
+          ]]; then
+            echo "✅ All build tests passed."
+          else
+            echo "❌ One or more build tests failed."
+            exit 1
+          fi

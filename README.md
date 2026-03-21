@@ -2,12 +2,16 @@
 
 <div align="center">
 
-**A modern, cross-platform video frame extractor with a clean dark UI - powered by ffmpeg & yt-dlp.**
+**A modern, cross-platform video frame extractor with a clean UI - powered by ffmpeg & yt-dlp.**
 
 [![Release](https://img.shields.io/github/v/release/nokarin-dev/frameextractor?style=flat-square&color=4F8EF7)](https://github.com/nokarin-dev/frameextractor/releases/latest)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg?style=flat-square)](LICENSE)
 [![Flutter](https://img.shields.io/badge/Flutter-3.22-02569B?style=flat-square&logo=flutter)](https://flutter.dev)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS%20%7C%20Android%20%7C%20iOS-02569B?style=flat-square)](#download)
+[![Total Downloads](https://img.shields.io/github/downloads/nokarin-dev/frameextractor/total?style=flat-square&logoColor=%3D&color=3471eb
+)](/releases)
+[![Latest Downloads](https://img.shields.io/github/downloads/nokarin-dev/frameextractor/latest/total?style=flat-square&color=3d47d4
+)](/releases/latest)
 
 </div>
 
