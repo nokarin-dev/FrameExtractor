@@ -12,6 +12,10 @@
 )](/releases)
 [![Latest Downloads](https://img.shields.io/github/downloads/nokarin-dev/frameextractor/latest/total?style=flat-square&color=3d47d4
 )](/releases/latest)
+[![Test Status](https://img.shields.io/github/actions/workflow/status/nokarin-dev/frameextractor/build-test.yml?style=flat-square&label=test%20build&color=22316e
+)](https://github.com/nokarin-dev/FrameExtractor/actions/workflows/build-test.yml)
+[![Release Status](https://img.shields.io/github/actions/workflow/status/nokarin-dev/frameextractor/build.yml?style=flat-square&label=release%20build&color=22316e
+)](https://github.com/nokarin-dev/FrameExtractor/actions/workflows/build.yml)
 
 </div>
 

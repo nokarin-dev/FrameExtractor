@@ -101,13 +101,19 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Build Linux (debug — fast compile check)
+      - name: Build Linux (debug)
         run: flutter build linux --debug --dart-define=PORTABLE=false
 
       - name: Verify build output exists
         run: |
-          ls -lh build/linux/x64/debug/bundle/frameextractor
-          echo "✓ Linux debug build OK"
+          EXE=$(find build/linux/x64/debug/bundle -maxdepth 1 -type f ! -name "*.so" | head -1)
+          if [ -n "$EXE" ]; then
+            echo "✓ Linux debug build OK — $EXE ($(du -h "$EXE" | cut -f1))"
+          else
+            echo "✗ No executable found in bundle"
+            ls -la build/linux/x64/debug/bundle/
+            exit 1
+          fi
 
   # Windows build test
   test-windows:
@@ -241,7 +247,51 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Build iOS (no-codesign — compile check only)
+      - name: Set iOS minimum deployment target
+        run: |
+          cat > ios/Podfile << 'EOF'
+          platform :ios, '13.0'
+          ENV['COCOAPODS_DISABLE_STATS'] = 'true'
+          project 'Runner', {
+            'Debug' => :debug,
+            'Profile' => :release,
+            'Release' => :release,
+          }
+          def flutter_root
+            generated_xcode_build_settings_path = File.expand_path(File.join('..', 'Flutter', 'Generated.xcconfig'), __FILE__)
+            unless File.exist?(generated_xcode_build_settings_path)
+              raise "#{generated_xcode_build_settings_path} must exist. Run flutter pub get first."
+            end
+            File.foreach(generated_xcode_build_settings_path) do |line|
+              matches = line.match(/FLUTTER_ROOT\=(.*)/)
+              return matches[1].strip if matches
+            end
+            raise "FLUTTER_ROOT not found in #{generated_xcode_build_settings_path}."
+          end
+          require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelper'), flutter_root)
+          flutter_ios_podfile_setup
+          target 'Runner' do
+            use_frameworks!
+            use_modular_headers!
+            flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+            target 'RunnerTests' do
+              inherit! :search_paths
+            end
+          end
+          post_install do |installer|
+            installer.pods_project.targets.each do |target|
+              flutter_additional_ios_build_settings(target)
+              target.build_configurations.each do |config|
+                if config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'].to_f < 13.0
+                  config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
+                end
+              end
+            end
+          end
+          EOF
+          echo "✓ Podfile written with iOS 13.0 target"
+
+      - name: Build iOS
         run: |
           flutter build ios \
             --debug \
