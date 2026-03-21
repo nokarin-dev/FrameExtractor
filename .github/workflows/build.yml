@@ -1,0 +1,417 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  # Download ffmpeg & yt-dlp
+  prepare-binaries:
+    name: Download ffmpeg & yt-dlp
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache binaries
+        id: cache-bins
+        uses: actions/cache@v4
+        with:
+          path: assets/binaries
+          key: binaries-${{ hashFiles('scripts/prepare_binaries.py') }}-v1
+
+      - name: Download binaries
+        if: steps.cache-bins.outputs.cache-hit != 'true'
+        run: python3 scripts/prepare_binaries.py --all
+
+      - name: Upload binary artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: binaries
+          path: assets/binaries
+          retention-days: 1
+
+  # Windows
+  build-windows:
+    name: Windows
+    needs: prepare-binaries
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download binaries artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: binaries
+          path: assets/binaries
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.22.x"
+          channel: stable
+          cache: true
+
+      - run: flutter pub get
+
+      # Installer
+      - name: Build Windows (installer)
+        run: flutter build windows --release --dart-define=PORTABLE=false
+
+      - name: Inject binaries — installer
+        shell: pwsh
+        run: |
+          $dest = "build\windows\x64\runner\Release\bin"
+          New-Item -ItemType Directory -Force -Path $dest | Out-Null
+          Copy-Item "assets\binaries\windows\ffmpeg.exe" $dest
+          Copy-Item "assets\binaries\windows\yt-dlp.exe" $dest
+
+      - name: Package Windows installer
+        shell: pwsh
+        run: |
+          Compress-Archive -Path "build\windows\x64\runner\Release\*" `
+            -DestinationPath "FrameExtractor-windows-installer.zip"
+
+      # Portable
+      - name: Build Windows (portable)
+        run: flutter build windows --release --dart-define=PORTABLE=true
+
+      - name: Inject binaries — portable
+        shell: pwsh
+        run: |
+          $dest = "build\windows\x64\runner\Release\bin"
+          New-Item -ItemType Directory -Force -Path $dest | Out-Null
+          Copy-Item "assets\binaries\windows\ffmpeg.exe" $dest
+          Copy-Item "assets\binaries\windows\yt-dlp.exe" $dest
+
+      - name: Package Windows portable
+        shell: pwsh
+        run: |
+          Compress-Archive -Path "build\windows\x64\runner\Release\*" `
+            -DestinationPath "FrameExtractor-windows-portable.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-builds
+          path: |
+            FrameExtractor-windows-installer.zip
+            FrameExtractor-windows-portable.zip
+
+  #.Linux
+  build-linux:
+    name: Linux
+    needs: prepare-binaries
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Flutter system dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y \
+            clang cmake ninja-build pkg-config \
+            libgtk-3-dev liblzma-dev libstdc++-12-dev
+
+      - name: Download binaries artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: binaries
+          path: assets/binaries
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.22.x"
+          channel: stable
+          cache: true
+
+      - run: flutter pub get
+
+      # Installer
+      - name: Build Linux (installer)
+        run: flutter build linux --release --dart-define=PORTABLE=false
+
+      - name: Inject binaries — installer
+        run: |
+          mkdir -p build/linux/x64/release/bundle/bin
+          cp assets/binaries/linux/ffmpeg build/linux/x64/release/bundle/bin/
+          cp assets/binaries/linux/yt-dlp  build/linux/x64/release/bundle/bin/
+          chmod +x build/linux/x64/release/bundle/bin/*
+
+      - name: Package Linux installer
+        run: |
+          tar -czf FrameExtractor-linux-installer.tar.gz \
+            -C build/linux/x64/release/bundle .
+
+      # Portable
+      - name: Build Linux (portable)
+        run: flutter build linux --release --dart-define=PORTABLE=true
+
+      - name: Inject binaries — portable
+        run: |
+          mkdir -p build/linux/x64/release/bundle/bin
+          cp assets/binaries/linux/ffmpeg build/linux/x64/release/bundle/bin/
+          cp assets/binaries/linux/yt-dlp  build/linux/x64/release/bundle/bin/
+          chmod +x build/linux/x64/release/bundle/bin/*
+
+      - name: Package Linux portable
+        run: |
+          tar -czf FrameExtractor-linux-portable.tar.gz \
+            -C build/linux/x64/release/bundle .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-builds
+          path: |
+            FrameExtractor-linux-installer.tar.gz
+            FrameExtractor-linux-portable.tar.gz
+
+  # Android APK
+  build-android:
+    name: Android
+    needs: prepare-binaries
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download binaries artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: binaries
+          path: assets/binaries
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.22.x"
+          channel: stable
+          cache: true
+
+      - run: flutter pub get
+
+      # Signing
+      - name: Setup release signing
+        if: ${{ secrets.KEYSTORE_BASE64 != '' }}
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/keystore.jks
+          cat > android/key.properties << EOF
+          storePassword=${{ secrets.STORE_PASSWORD }}
+          keyPassword=${{ secrets.KEY_PASSWORD }}
+          keyAlias=${{ secrets.KEY_ALIAS }}
+          storeFile=keystore.jks
+          EOF
+
+      # Build split APKs
+      - name: Build split APKs
+        run: |
+          flutter build apk --release --dart-define=PORTABLE=false --split-per-abi
+
+      - name: Rename APKs
+        run: |
+          cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk FrameExtractor-android-arm64.apk
+          cp build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk FrameExtractor-android-arm32.apk
+          cp build/app/outputs/flutter-apk/app-x86_64-release.apk FrameExtractor-android-x86_64.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-build
+          path: |
+            FrameExtractor-android-arm64.apk
+            FrameExtractor-android-arm32.apk
+            FrameExtractor-android-x86_64.apk
+
+  # macOS
+  build-macos:
+    name: macOS
+    needs: prepare-binaries
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download binaries artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: binaries
+          path: assets/binaries
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.22.x"
+          channel: stable
+          cache: true
+
+      - run: flutter pub get
+
+      # Installer
+      - name: Build macOS (installer)
+        run: flutter build macos --release --dart-define=PORTABLE=false
+
+      - name: Inject binaries — installer
+        run: |
+          APP="build/macos/Build/Products/Release/frameextractor.app"
+          mkdir -p "$APP/Contents/MacOS/bin"
+          cp assets/binaries/macos/ffmpeg "$APP/Contents/MacOS/bin/"
+          cp assets/binaries/macos/yt-dlp "$APP/Contents/MacOS/bin/"
+          chmod +x "$APP/Contents/MacOS/bin/"*
+
+      - name: Package macOS installer (dmg)
+        run: |
+          APP="build/macos/Build/Products/Release/frameextractor.app"
+          hdiutil create -volname "FrameExtractor" \
+            -srcfolder "$APP" -ov -format UDZO \
+            "FrameExtractor-macos-installer.dmg"
+
+      # Portable
+      - name: Build macOS (portable)
+        run: flutter build macos --release --dart-define=PORTABLE=true
+
+      - name: Inject binaries — portable
+        run: |
+          APP="build/macos/Build/Products/Release/frameextractor.app"
+          mkdir -p "$APP/Contents/MacOS/bin"
+          cp assets/binaries/macos/ffmpeg "$APP/Contents/MacOS/bin/"
+          cp assets/binaries/macos/yt-dlp "$APP/Contents/MacOS/bin/"
+          chmod +x "$APP/Contents/MacOS/bin/"*
+
+      - name: Package macOS portable (zip)
+        run: |
+          APP="build/macos/Build/Products/Release/frameextractor.app"
+          ditto -c -k --sequesterRsrc --keepParent \
+            "$APP" "FrameExtractor-macos-portable.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-builds
+          path: |
+            FrameExtractor-macos-installer.dmg
+            FrameExtractor-macos-portable.zip
+
+  # iOS
+  build-ios:
+    name: iOS
+    needs: prepare-binaries
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.22.x"
+          channel: stable
+          cache: true
+
+      - run: flutter pub get
+
+      - name: Import signing certificate
+        if: ${{ secrets.IOS_CERTIFICATE_BASE64 != '' }}
+        run: |
+          echo "${{ secrets.IOS_CERTIFICATE_BASE64 }}" | base64 -d > /tmp/cert.p12
+          security create-keychain -p "" build.keychain
+          security import /tmp/cert.p12 -k build.keychain \
+            -P "${{ secrets.IOS_CERTIFICATE_PASSWORD }}" -T /usr/bin/codesign
+          security list-keychains -s build.keychain
+          security set-keychain-settings build.keychain
+          security unlock-keychain -p "" build.keychain
+          echo "${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}" | base64 -d \
+            > ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision
+
+      - name: Build iOS (signed)
+        if: ${{ secrets.IOS_CERTIFICATE_BASE64 != '' }}
+        run: |
+          flutter build ipa --release \
+            --dart-define=PORTABLE=false \
+            --export-options-plist=ios/ExportOptions.plist
+          cp build/ios/ipa/*.ipa FrameExtractor-ios.ipa
+
+      - name: Build iOS (unsigned — sideload)
+        if: ${{ secrets.IOS_CERTIFICATE_BASE64 == '' }}
+        run: |
+          flutter build ios --release --no-codesign --dart-define=PORTABLE=false
+          mkdir -p Payload
+          cp -r build/ios/Release-iphoneos/Runner.app Payload/
+          zip -r FrameExtractor-ios-unsigned.ipa Payload/
+          rm -rf Payload
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ios-build
+          path: |
+            FrameExtractor-ios.ipa
+            FrameExtractor-ios-unsigned.ipa
+
+  # Release
+  release:
+    name: Create Release
+    needs: [build-windows, build-linux, build-android, build-macos, build-ios]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: "*-build*"
+          merge-multiple: true
+
+      - name: Generate changelog
+        run: |
+          PREV_TAG=$(git tag --sort=-version:refname | sed -n '2p')
+          if [ -z "$PREV_TAG" ]; then
+            LOG=$(git log --oneline --no-decorate | head -20)
+          else
+            LOG=$(git log --oneline --no-decorate ${PREV_TAG}..HEAD)
+          fi
+          echo "CHANGELOG<<EOF" >> $GITHUB_ENV
+          echo "$LOG" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Frame Extractor ${{ github.ref_name }}"
+          body: |
+            ## What's changed
+            ${{ env.CHANGELOG }}
+
+            ---
+
+            ## Downloads
+
+            | Platform | File | Notes |
+            |---|---|---|
+            | 🪟 Windows | `FrameExtractor-windows-installer.zip` | Extract & run `.exe` |
+            | 🪟 Windows Portable | `FrameExtractor-windows-portable.zip` | No install needed |
+            | 🐧 Linux | `FrameExtractor-linux-installer.tar.gz` | Extract & run |
+            | 🐧 Linux Portable | `FrameExtractor-linux-portable.tar.gz` | Self-contained folder |
+            | 🍎 macOS | `FrameExtractor-macos-installer.dmg` | Open dmg & drag to Applications |
+            | 🍎 macOS Portable | `FrameExtractor-macos-portable.zip` | Extract & run anywhere |
+            | 🤖 Android (arm64) | `FrameExtractor-android-arm64.apk` | Most modern phones (2018+) |
+            | 🤖 Android (arm32) | `FrameExtractor-android-arm32.apk` | Older 32-bit phones |
+            | 🤖 Android (x86_64) | `FrameExtractor-android-x86_64.apk` | Emulators / Chromebooks |
+            | 📱 iOS | `FrameExtractor-ios.ipa` / `FrameExtractor-ios-unsigned.ipa` | Sideload via AltStore/TrollStore |
+
+            > **Windows/Linux/macOS:** ffmpeg & yt-dlp bundled inside the zip/dmg.
+            > **Android:** yt-dlp bundled in APK, ffmpeg via ffmpeg_kit.
+            > **iOS:** ffmpeg via ffmpeg_kit, YouTube via API.
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          files: |
+            dist/FrameExtractor-windows-installer.zip
+            dist/FrameExtractor-windows-portable.zip
+            dist/FrameExtractor-linux-installer.tar.gz
+            dist/FrameExtractor-linux-portable.tar.gz
+            dist/FrameExtractor-macos-installer.dmg
+            dist/FrameExtractor-macos-portable.zip
+            dist/FrameExtractor-android-arm64.apk
+            dist/FrameExtractor-android-arm32.apk
+            dist/FrameExtractor-android-x86_64.apk
+            dist/FrameExtractor-ios.ipa
+            dist/FrameExtractor-ios-unsigned.ipa
+          token: ${{ secrets.GITHUB_TOKEN }}
