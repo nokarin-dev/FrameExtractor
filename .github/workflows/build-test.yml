@@ -30,9 +30,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: dart-lang/setup-dart@v1
+      - uses: subosito/flutter-action@v2
         with:
-          sdk: '3.10.4'
+          flutter-version: '3.x'
+          channel: stable
+          cache: true
 
       - name: Install dependencies
         run: flutter pub get
@@ -90,14 +92,16 @@ jobs:
           name: dummy-binaries
           path: assets/binaries
 
-      - uses: dart-lang/setup-dart@v1
+      - uses: subosito/flutter-action@v2
         with:
-          sdk: '3.10.4'
+          flutter-version: '3.x'
+          channel: stable
+          cache: true
 
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Build Linux
+      - name: Build Linux (debug — fast compile check)
         run: flutter build linux --debug --dart-define=PORTABLE=false
 
       - name: Verify build output exists
@@ -119,9 +123,11 @@ jobs:
           name: dummy-binaries
           path: assets/binaries
 
-      - uses: dart-lang/setup-dart@v1
+      - uses: subosito/flutter-action@v2
         with:
-          sdk: '3.10.4'
+          flutter-version: '3.x'
+          channel: stable
+          cache: true
 
       - name: Install dependencies
         run: flutter pub get
@@ -154,9 +160,11 @@ jobs:
           name: dummy-binaries
           path: assets/binaries
 
-      - uses: dart-lang/setup-dart@v1
+      - uses: subosito/flutter-action@v2
         with:
-          sdk: '3.10.4'
+          flutter-version: '3.x'
+          channel: stable
+          cache: true
 
       - name: Install dependencies
         run: flutter pub get
@@ -194,9 +202,11 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - uses: dart-lang/setup-dart@v1
+      - uses: subosito/flutter-action@v2
         with:
-          sdk: '3.10.4'
+          flutter-version: '3.x'
+          channel: stable
+          cache: true
 
       - name: Install dependencies
         run: flutter pub get
@@ -222,9 +232,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: dart-lang/setup-dart@v1
+      - uses: subosito/flutter-action@v2
         with:
-          sdk: '3.10.4'
+          flutter-version: '3.x'
+          channel: stable
+          cache: true
 
       - name: Install dependencies
         run: flutter pub get
