@@ -213,46 +213,6 @@ jobs:
           cache: true
       - run: flutter pub get
 
-      - name: Patch iOS deployment target
-        run: |
-          cat > /tmp/patch_ios.py << 'EOF'
-          import re, os
-
-          pbx = "ios/Runner.xcodeproj/project.pbxproj"
-          if os.path.exists(pbx):
-              t = open(pbx).read()
-              t = re.sub(r"IPHONEOS_DEPLOYMENT_TARGET = [0-9.]+",
-                         "IPHONEOS_DEPLOYMENT_TARGET = 13.0", t)
-              open(pbx, "w").write(t)
-              print("patched xcodeproj")
-
-          pf = "ios/Podfile"
-          if not os.path.exists(pf):
-              print("no Podfile yet")
-          else:
-              t = open(pf).read()
-              if re.search(r"^platform :ios", t, re.MULTILINE):
-                  t = re.sub(r"^platform :ios.*", "platform :ios, '13.0'",
-                             t, flags=re.MULTILINE)
-              else:
-                  t = "platform :ios, '13.0'\n" + t
-              if "IPHONEOS_DEPLOYMENT_TARGET" in t:
-                  t = re.sub(
-                      r"(build_settings\[.IPHONEOS_DEPLOYMENT_TARGET.\]\s*=\s*)['\"][0-9.]+['\"]",
-                      r"\g<1>'13.0'", t)
-              elif "post_install" in t:
-                  inject = ("\n        target.build_configurations.each do |config|\n"
-                            "          config.build_settings"
-                            "['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'\n"
-                            "        end")
-                  t = re.sub(
-                      r"(flutter_additional_ios_build_settings\(target\))",
-                      r"\1" + inject, t, count=1)
-              open(pf, "w").write(t)
-              print("patched Podfile")
-          EOF
-          python3 /tmp/patch_ios.py
-
       - name: Build iOS
         run: |
           flutter build ios \
