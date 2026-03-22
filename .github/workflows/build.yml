@@ -5,11 +5,62 @@ on:
     tags:
       - "v*"
   workflow_dispatch:
+    inputs:
+      skip_tests:
+        description: 'Skip build test gate'
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write
+  actions: read
 
 jobs:
+  check-tests:
+    name: Verify build tests passed
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check latest test workflow run
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const skip = '${{ github.event.inputs.skip_tests }}' === 'true';
+            if (skip) {
+              core.warning('Build test gate skipped by manual override');
+              return;
+            }
+            
+            const tagRef = await github.rest.git.getRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: `tags/${context.ref.replace('refs/tags/', '')}`,
+            }).catch(() => null);
+            
+            const sha = tagRef?.data?.object?.sha || context.sha;
+            
+            const runs = await github.rest.actions.listWorkflowRuns({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'test.yml',
+              head_sha: sha,
+              per_page: 5,
+            });
+            
+            const passing = runs.data.workflow_runs.find(
+              r => r.conclusion === 'success'
+            );
+            
+            if (!passing) {
+              core.setFailed(
+                `No passing build test found for commit ${sha}. ` +
+                `Run the Build Test workflow first, or use workflow_dispatch ` +
+                `with skip_tests=true for an emergency release.`
+              );
+            } else {
+              core.info(`Build tests passed: ${passing.html_url}`);
+            }
+
   # Download ffmpeg & yt-dlp
   prepare-binaries:
     name: Download ffmpeg & yt-dlp
@@ -43,15 +94,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download binaries artifact
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
           name: binaries
           path: assets/binaries
 
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.x'
+          flutter-version: "3.x"
           channel: stable
           cache: true
 
@@ -69,11 +119,60 @@ jobs:
           Copy-Item "assets\binaries\windows\ffmpeg.exe" $dest
           Copy-Item "assets\binaries\windows\yt-dlp.exe" $dest
 
-      - name: Package Windows installer
+      - name: Create Inno Setup script
         shell: pwsh
         run: |
-          Compress-Archive -Path "build\windows\x64\runner\Release\*" `
-            -DestinationPath "FrameExtractor-windows-installer.zip"
+          $version = (Get-Content pubspec.yaml | Select-String "^version:" | `
+            ForEach-Object { $_ -replace "version:\s*", "" } | `
+            ForEach-Object { $_ -replace "\+.*", "" }).Trim()
+          
+          $iss = @"
+          [Setup]
+          AppName=Frame Extractor
+          AppVersion=$version
+          AppPublisher=nokarin
+          AppPublisherURL=https://github.com/nokarin-dev/frameextractor
+          AppSupportURL=https://github.com/nokarin-dev/frameextractor/issues
+          DefaultDirName={autopf}\FrameExtractor
+          DefaultGroupName=Frame Extractor
+          AllowNoIcons=yes
+          OutputDir=.
+          OutputBaseFilename=FrameExtractor-windows-installer
+          Compression=lzma2/ultra64
+          SolidCompression=yes
+          WizardStyle=modern
+          PrivilegesRequiredOverridesAllowed=dialog
+          UninstallDisplayIcon={app}\frameextractor.exe
+          SetupIconFile=windows\runner\resources\app_icon.ico
+          
+          [Languages]
+          Name: "english"; MessagesFile: "compiler:Default.isl"
+          
+          [Tasks]
+          Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
+          
+          [Files]
+          Source: "build\windows\x64\runner\Release\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
+          
+          [Icons]
+          Name: "{group}\Frame Extractor"; Filename: "{app}\frameextractor.exe"
+          Name: "{group}\Uninstall Frame Extractor"; Filename: "{uninstallexe}"
+          Name: "{commondesktop}\Frame Extractor"; Filename: "{app}\frameextractor.exe"; Tasks: desktopicon
+          
+          [Run]
+          Filename: "{app}\frameextractor.exe"; Description: "{cm:LaunchProgram,Frame Extractor}"; Flags: nowait postinstall skipifsilent
+          "@
+          
+          $iss | Out-File -FilePath "installer.iss" -Encoding UTF8
+          Write-Host "Inno Setup script created for version $version"
+
+      - name: Compile installer with Inno Setup
+        shell: pwsh
+        run: |
+          # Inno Setup is pre-installed on GitHub Actions Windows runners
+          $inno = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          & $inno "installer.iss"
+          Write-Host "Installer compiled: FrameExtractor-windows-installer.exe"
 
       # Portable
       - name: Build Windows (portable)
@@ -108,22 +207,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Flutter system dependencies
+      - name: Install system dependencies
         run: |
           sudo apt-get update -y
           sudo apt-get install -y \
             clang cmake ninja-build pkg-config \
             libgtk-3-dev liblzma-dev libstdc++-12-dev
 
-      - name: Download binaries artifact
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
           name: binaries
           path: assets/binaries
 
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.x'
+          flutter-version: "3.x"
           channel: stable
           cache: true
 
@@ -133,11 +231,11 @@ jobs:
       - name: Build Linux (installer)
         run: flutter build linux --release --dart-define=PORTABLE=false
 
-      - name: Inject binaries — installer
+      - name: Inject binaries (installer)
         run: |
           mkdir -p build/linux/x64/release/bundle/bin
           cp assets/binaries/linux/ffmpeg build/linux/x64/release/bundle/bin/
-          cp assets/binaries/linux/yt-dlp  build/linux/x64/release/bundle/bin/
+          cp assets/binaries/linux/yt-dlp build/linux/x64/release/bundle/bin/
           chmod +x build/linux/x64/release/bundle/bin/*
 
       - name: Package Linux installer
@@ -149,7 +247,7 @@ jobs:
       - name: Build Linux (portable)
         run: flutter build linux --release --dart-define=PORTABLE=true
 
-      - name: Inject binaries — portable
+      - name: Inject binaries (portable)
         run: |
           mkdir -p build/linux/x64/release/bundle/bin
           cp assets/binaries/linux/ffmpeg build/linux/x64/release/bundle/bin/
@@ -176,8 +274,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download binaries artifact
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
           name: binaries
           path: assets/binaries
@@ -189,7 +286,7 @@ jobs:
 
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.x'
+          flutter-version: "3.x"
           channel: stable
           cache: true
 
@@ -197,7 +294,9 @@ jobs:
 
       # Signing
       - name: Setup release signing
-        if: ${{ secrets.KEYSTORE_BASE64 != '' }}
+        env:
+          KEYSTORE_B64: ${{ secrets.KEYSTORE_BASE64 }}
+        if: env.KEYSTORE_B64 != ''
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/keystore.jks
           cat > android/key.properties << EOF
@@ -234,25 +333,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download binaries artifact
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
           name: binaries
           path: assets/binaries
 
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.x'
+          flutter-version: "3.x"
           channel: stable
           cache: true
 
       - run: flutter pub get
 
       # Installer
-      - name: Build macOS (installer)
+      - name: Build macOS installer
         run: flutter build macos --release --dart-define=PORTABLE=false
 
-      - name: Inject binaries — installer
+      - name: Inject binaries (installer)
         run: |
           APP="build/macos/Build/Products/Release/frameextractor.app"
           mkdir -p "$APP/Contents/MacOS/bin"
@@ -260,12 +358,11 @@ jobs:
           cp assets/binaries/macos/yt-dlp "$APP/Contents/MacOS/bin/"
           chmod +x "$APP/Contents/MacOS/bin/"*
 
-      - name: Package macOS installer (dmg)
+      - name: Package installer (dmg)
         run: |
-          APP="build/macos/Build/Products/Release/frameextractor.app"
           hdiutil create -volname "FrameExtractor" \
-            -srcfolder "$APP" -ov -format UDZO \
-            "FrameExtractor-macos-installer.dmg"
+            -srcfolder "build/macos/Build/Products/Release/frameextractor.app" \
+            -ov -format UDZO "FrameExtractor-macos-installer.dmg"
 
       # Portable
       - name: Build macOS (portable)
@@ -279,11 +376,11 @@ jobs:
           cp assets/binaries/macos/yt-dlp "$APP/Contents/MacOS/bin/"
           chmod +x "$APP/Contents/MacOS/bin/"*
 
-      - name: Package macOS portable (zip)
+      - name: Package portable (zip)
         run: |
-          APP="build/macos/Build/Products/Release/frameextractor.app"
           ditto -c -k --sequesterRsrc --keepParent \
-            "$APP" "FrameExtractor-macos-portable.zip"
+            "build/macos/Build/Products/Release/frameextractor.app" \
+            "FrameExtractor-macos-portable.zip"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -302,14 +399,56 @@ jobs:
 
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.x'
+          flutter-version: "3.x"
           channel: stable
           cache: true
 
       - run: flutter pub get
 
+      - name: Patch ffmpeg_kit podspec deployment target
+        run: |
+          # ffmpeg_kit_flutter_new podspec reports incorrect minimum deployment
+          # target — patch it directly so CocoaPods can resolve dependencies
+          PODSPEC=$(find "$HOME/.pub-cache" \
+            -path "*/ffmpeg_kit_flutter_new*/*.podspec" 2>/dev/null | head -1)
+          if [ -z "$PODSPEC" ]; then
+            PODSPEC=$(find . \
+              -path "*/.symlinks/plugins/ffmpeg_kit_flutter_new/ios/*.podspec" \
+              2>/dev/null | head -1)
+          fi
+          if [ -n "$PODSPEC" ]; then
+            echo "Patching: $PODSPEC"
+            python3 -c "
+              import re, sys
+              f = open('$PODSPEC').read()
+              f = re.sub(r\"s\\.ios\\.deployment_target\\s*=\\s*'[0-9.]+'\",
+              \"s.ios.deployment_target = '13.0'\", f)
+              f = re.sub(r\"s\\.deployment_target\\s*=\\s*'[0-9.]+'\",
+              \"s.deployment_target = '13.0'\", f)
+              open('$PODSPEC', 'w').write(f)
+              print('done')
+            "
+          else
+            echo "podspec not found in pub cache — will attempt build anyway"
+          fi
+
+          # Also patch xcodeproj
+          PBXPROJ="ios/Runner.xcodeproj/project.pbxproj"
+          if [ -f "$PBXPROJ" ]; then
+            python3 -c "
+              import re
+              f = open('$PBXPROJ').read()
+              f = re.sub(r'IPHONEOS_DEPLOYMENT_TARGET = [0-9.]+',
+              'IPHONEOS_DEPLOYMENT_TARGET = 13.0', f)
+              open('$PBXPROJ', 'w').write(f)
+              print('xcodeproj patched')
+            "
+          fi
+
       - name: Import signing certificate
-        if: ${{ secrets.IOS_CERTIFICATE_BASE64 != '' }}
+        env:
+          IOS_CERT: ${{ secrets.IOS_CERTIFICATE_BASE64 }}
+        if: env.IOS_CERT != ''
         run: |
           echo "${{ secrets.IOS_CERTIFICATE_BASE64 }}" | base64 -d > /tmp/cert.p12
           security create-keychain -p "" build.keychain
@@ -322,7 +461,9 @@ jobs:
             > ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision
 
       - name: Build iOS (signed)
-        if: ${{ secrets.IOS_CERTIFICATE_BASE64 != '' }}
+        env:
+          IOS_CERT: ${{ secrets.IOS_CERTIFICATE_BASE64 }}
+        if: env.IOS_CERT != ''
         run: |
           flutter build ipa --release \
             --dart-define=PORTABLE=false \
@@ -344,6 +485,7 @@ jobs:
           path: |
             FrameExtractor-ios.ipa
             FrameExtractor-ios-unsigned.ipa
+        if: always()
 
   # Release
   release:
@@ -352,6 +494,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -364,9 +508,11 @@ jobs:
         run: |
           VERSION="${{ github.ref_name }}"
           VERSION_BARE="${VERSION#v}"
-          
-          SECTION=$(awk             "/^## \[$VERSION_BARE\]/{found=1; next} found && /^## \[/{exit} found{print}"             CHANGELOG.md)
-          
+
+          SECTION=$(awk \
+            "/^## \[$VERSION_BARE\]/{found=1; next} found && /^## \[/{exit} found{print}" \
+            CHANGELOG.md)
+
           if [ -z "$SECTION" ]; then
             PREV_TAG=$(git tag --sort=-version:refname | sed -n '2p')
             if [ -z "$PREV_TAG" ]; then
@@ -375,9 +521,9 @@ jobs:
               SECTION=$(git log --oneline --no-decorate ${PREV_TAG}..HEAD)
             fi
           fi
-          
+
           echo "CHANGELOG<<EOF" >> $GITHUB_ENV
-          echo "$LOG" >> $GITHUB_ENV
+          echo "$SECTION" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
 
       - name: Create GitHub Release
