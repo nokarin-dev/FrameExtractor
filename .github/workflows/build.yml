@@ -208,7 +208,13 @@ jobs:
           # Copy app bundle
           cp -r "$BUNDLE/." "$PKG/opt/frameextractor/"
 
-          # Symlink to /usr/bin for CLI access
+          EXE=$(find "$PKG/opt/frameextractor" -maxdepth 1 -type f ! -name "*.so" ! -name "*.desktop" | head -1)
+          EXE_NAME=$(basename "$EXE")
+          if [ "$EXE_NAME" != "frameextractor" ]; then
+            mv "$EXE" "$PKG/opt/frameextractor/frameextractor"
+            echo "Renamed $EXE_NAME → frameextractor"
+          fi
+
           ln -s /opt/frameextractor/frameextractor "$PKG/usr/bin/frameextractor"
 
           # Desktop entry
@@ -226,7 +232,7 @@ jobs:
           StartupWMClass=frameextractor
           DESKTOP
 
-          # App icon (copy from Flutter assets if present)
+          # App icon
           if [ -f "assets/icon.png" ]; then
             cp "assets/icon.png" "$PKG/usr/share/icons/hicolor/256x256/apps/frameextractor.png"
           fi
@@ -246,12 +252,12 @@ jobs:
           Homepage: https://github.com/nokarin-dev/frameextractor
           EOF
 
-          # post-install script to fix permissions
+          # post-install script
           cat > "$PKG/DEBIAN/postinst" << 'POSTINST'
           #!/bin/sh
-          chmod +x /opt/frameextractor/frameextractor
-          chmod +x /opt/frameextractor/bin/ffmpeg   2>/dev/null || true
-          chmod +x /opt/frameextractor/bin/yt-dlp   2>/dev/null || true
+          chmod +x /opt/frameextractor/frameextractor 2>/dev/null || true
+          chmod +x /opt/frameextractor/bin/ffmpeg 2>/dev/null || true
+          chmod +x /opt/frameextractor/bin/yt-dlp 2>/dev/null || true
           update-desktop-database /usr/share/applications 2>/dev/null || true
           exit 0
           POSTINST
@@ -286,47 +292,26 @@ jobs:
           APPIMAGETOOL="/tmp/squashfs-root/AppRun"
           cd "$GITHUB_WORKSPACE"
 
-          # Create AppDir structure
-          mkdir -p AppDir/usr/bin
-          mkdir -p AppDir/usr/lib
+          mkdir -p AppDir/app
           mkdir -p AppDir/usr/share/applications
           mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
 
-          # Detect executable name (may be FrameExtractor or frameextractor)
-          EXE=$(find "$BUNDLE" -maxdepth 1 -type f ! -name "*.so" ! -name "*.desktop" | head -1)
+          cp -r "$BUNDLE/." AppDir/app/
+          chmod +x AppDir/app/bin/ffmpeg AppDir/app/bin/yt-dlp
+
+          # Detect executable name
+          EXE=$(find AppDir/app -maxdepth 1 -type f ! -name "*.so" ! -name "*.desktop" | head -1)
           EXE_NAME=$(basename "$EXE")
           echo "Detected executable: $EXE_NAME"
-
-          # Copy app files
-          cp "$EXE" AppDir/usr/bin/frameextractor
-          chmod +x AppDir/usr/bin/frameextractor
-
-          # Copy shared libraries
-          if [ -d "$BUNDLE/lib" ]; then
-            cp -r "$BUNDLE/lib/"* AppDir/usr/lib/ 2>/dev/null || true
-          fi
-
-          # Copy data directory
-          if [ -d "$BUNDLE/data" ]; then
-            cp -r "$BUNDLE/data" AppDir/usr/
-          fi
-
-          # Copy bundled binaries
-          mkdir -p AppDir/usr/bin/bin
-          cp "$BUNDLE/bin/ffmpeg"  AppDir/usr/bin/bin/
-          cp "$BUNDLE/bin/yt-dlp" AppDir/usr/bin/bin/
-          chmod +x AppDir/usr/bin/bin/*
 
           # App icon
           if [ -f "assets/icon.png" ]; then
             cp "assets/icon.png" AppDir/usr/share/icons/hicolor/256x256/apps/frameextractor.png
             cp "assets/icon.png" AppDir/frameextractor.png
           else
-            # Create a minimal placeholder icon
-            convert -size 256x256 xc:gray AppDir/frameextractor.png 2>/dev/null ||               printf 'PNG' > AppDir/frameextractor.png
+            printf 'PNG' > AppDir/frameextractor.png
           fi
 
-          # .desktop file (required by AppImage)
           cat > AppDir/frameextractor.desktop << 'DESKTOP'
           [Desktop Entry]
           Version=1.0
@@ -340,13 +325,16 @@ jobs:
           Terminal=false
           DESKTOP
 
-          # AppRun entrypoint
           cat > AppDir/AppRun << 'APPRUN'
           #!/bin/sh
           APPDIR="$(dirname "$(readlink -f "$0")")"
-          export PATH="$APPDIR/usr/bin:$APPDIR/usr/bin/bin:$PATH"
-          export LD_LIBRARY_PATH="$APPDIR/usr/lib:$LD_LIBRARY_PATH"
-          exec "$APPDIR/usr/bin/frameextractor" "$@"
+
+          export PATH="$APPDIR/app/bin:$PATH"
+
+          export LD_LIBRARY_PATH="$APPDIR/app/lib:$LD_LIBRARY_PATH"
+
+          cd "$APPDIR/app"
+          exec "./$EXE_NAME" "$@"
           APPRUN
           chmod +x AppDir/AppRun
 
@@ -354,7 +342,7 @@ jobs:
           chmod +x "FrameExtractor-linux.AppImage"
           echo "✓ AppImage built: FrameExtractor-linux.AppImage"
 
-      # ortable
+      # portable
       - name: Build Linux (portable)
         run: flutter build linux --release --dart-define=PORTABLE=true
 
