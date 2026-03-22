@@ -5,16 +5,16 @@ on:
     branches:
       - flutter
     paths-ignore:
-      - '**.md'
-      - '.gitignore'
-      - 'LICENSE'
+      - "**.md"
+      - ".gitignore"
+      - "LICENSE"
   pull_request:
     branches:
       - flutter
     paths-ignore:
-      - '**.md'
-      - '.gitignore'
-      - 'LICENSE'
+      - "**.md"
+      - ".gitignore"
+      - "LICENSE"
 
 permissions:
   contents: read
@@ -30,7 +30,7 @@ jobs:
 
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.x'
+          flutter-version: "3.x"
           channel: stable
           cache: true
 
@@ -87,7 +87,7 @@ jobs:
 
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.x'
+          flutter-version: "3.x"
           channel: stable
           cache: true
       - run: flutter pub get
@@ -119,7 +119,7 @@ jobs:
 
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.x'
+          flutter-version: "3.x"
           channel: stable
           cache: true
       - run: flutter pub get
@@ -153,11 +153,11 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: "17"
 
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.x'
+          flutter-version: "3.x"
           channel: stable
           cache: true
       - run: flutter pub get
@@ -178,15 +178,15 @@ jobs:
     steps:
       - name: Check all jobs
         run: |
-          echo "analyze:      ${{ needs.analyze.result }}"
-          echo "test-linux:   ${{ needs.test-linux.result }}"
+          echo "analyze: ${{ needs.analyze.result }}"
+          echo "test-linux: ${{ needs.test-linux.result }}"
           echo "test-windows: ${{ needs.test-windows.result }}"
           echo "test-android: ${{ needs.test-android.result }}"
           if [[ \
-            "${{ needs.analyze.result }}"      == "success" && \
-            "${{ needs.test-linux.result }}"   == "success" && \
+            "${{ needs.analyze.result }}" == "success" && \
+            "${{ needs.test-linux.result }}" == "success" && \
             "${{ needs.test-windows.result }}" == "success" && \
-            "${{ needs.test-android.result }}" == "success" && \
+            "${{ needs.test-android.result }}" == "success" \
           ]]; then
             echo "✅ All build tests passed."
           else
