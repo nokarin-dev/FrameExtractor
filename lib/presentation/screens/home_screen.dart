@@ -210,7 +210,7 @@ class _HomeScreenState extends State<HomeScreen>
                     ),
                   ),
                   Text(
-                    'ffmpeg · yt-dlp',
+                    'Effortless video frame extraction',
                     style: TextStyle(color: _C.textMuted, fontSize: 10),
                   ),
                 ],
