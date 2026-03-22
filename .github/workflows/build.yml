@@ -471,7 +471,9 @@ jobs:
           cp build/ios/ipa/*.ipa FrameExtractor-ios.ipa
 
       - name: Build iOS (unsigned — sideload)
-        if: ${{ secrets.IOS_CERTIFICATE_BASE64 == '' }}
+        env:
+          IOS_CERT: ${{ secrets.IOS_CERTIFICATE_BASE64 }}
+        if: env.IOS_CERT == ''
         run: |
           flutter build ios --release --no-codesign --dart-define=PORTABLE=false
           mkdir -p Payload
