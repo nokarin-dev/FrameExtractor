@@ -42,7 +42,7 @@ jobs:
             const runs = await github.rest.actions.listWorkflowRuns({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              workflow_id: 'test.yml',
+              workflow_id: 'build-test.yml',
               head_sha: sha,
               per_page: 5,
             });
