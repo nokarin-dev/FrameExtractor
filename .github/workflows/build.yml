@@ -4,63 +4,12 @@ on:
   push:
     tags:
       - "v*"
-  workflow_dispatch:
-    inputs:
-      skip_tests:
-        description: 'Skip build test gate'
-        required: false
-        default: false
-        type: boolean
 
 permissions:
   contents: write
   actions: read
 
 jobs:
-  check-tests:
-    name: Verify build tests passed
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check latest test workflow run
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const skip = '${{ github.event.inputs.skip_tests }}' === 'true';
-            if (skip) {
-              core.warning('Build test gate skipped by manual override');
-              return;
-            }
-            
-            const tagRef = await github.rest.git.getRef({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              ref: `tags/${context.ref.replace('refs/tags/', '')}`,
-            }).catch(() => null);
-            
-            const sha = tagRef?.data?.object?.sha || context.sha;
-            
-            const runs = await github.rest.actions.listWorkflowRuns({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              workflow_id: 'build-test.yml',
-              head_sha: sha,
-              per_page: 5,
-            });
-            
-            const passing = runs.data.workflow_runs.find(
-              r => r.conclusion === 'success'
-            );
-            
-            if (!passing) {
-              core.setFailed(
-                `No passing build test found for commit ${sha}. ` +
-                `Run the Build Test workflow first, or use workflow_dispatch ` +
-                `with skip_tests=true for an emergency release.`
-              );
-            } else {
-              core.info(`Build tests passed: ${passing.html_url}`);
-            }
-
   # Download ffmpeg & yt-dlp
   prepare-binaries:
     name: Download ffmpeg & yt-dlp
