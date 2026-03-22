@@ -276,9 +276,12 @@ jobs:
         run: |
           BUNDLE="build/linux/x64/release/bundle"
 
-          # Download appimagetool
-          wget -q "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage"             -O /tmp/appimagetool
-          chmod +x /tmp/appimagetool
+          wget -q "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage" \
+            -O /tmp/appimagetool.AppImage
+          chmod +x /tmp/appimagetool.AppImage
+          cd /tmp && ./appimagetool.AppImage --appimage-extract > /dev/null 2>&1
+          APPIMAGETOOL="/tmp/squashfs-root/AppRun"
+          cd "$GITHUB_WORKSPACE"
 
           # Create AppDir structure
           mkdir -p AppDir/usr/bin
@@ -344,8 +347,7 @@ jobs:
           APPRUN
           chmod +x AppDir/AppRun
 
-          # Build AppImage (FUSE not available in CI, use --no-appstream)
-          ARCH=x86_64 /tmp/appimagetool --no-appstream AppDir             "FrameExtractor-linux.AppImage" 2>&1 ||           ARCH=x86_64 /tmp/appimagetool AppDir             "FrameExtractor-linux.AppImage"
+          ARCH=x86_64 "$APPIMAGETOOL" --no-appstream AppDir "FrameExtractor-linux.AppImage"
           chmod +x "FrameExtractor-linux.AppImage"
           echo "✓ AppImage built: FrameExtractor-linux.AppImage"
 
