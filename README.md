@@ -1,4 +1,4 @@
-![FrameExtractor Banner](https://github.com/user-attachments/assets/35a4f382-1940-4fb8-99f8-fe04eb20934e?raw=true)
+![FrameExtractor Banner](https://github.com/user-attachments/assets/101f833d-0ac6-4b51-a2ff-df70b71d796d?raw=true)
 
 <div align="center">
 

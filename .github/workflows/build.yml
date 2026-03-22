@@ -71,18 +71,18 @@ jobs:
       - name: Create Inno Setup script
         shell: pwsh
         run: |
-          $version = (Get-Content pubspec.yaml | Select-String "^version:" | `
-            ForEach-Object { $_ -replace "version:\s*", "" } | `
-            ForEach-Object { $_ -replace "\+.*", "" }).Trim()
+          $version = (Get-Content pubspec.yaml |
+            Select-String "^version:" |
+            ForEach-Object { ($_ -replace "version:\s*","") -replace "\+.*","" }).Trim()
 
-          $iss = @"
+          @"
           [Setup]
           AppName=Frame Extractor
           AppVersion=$version
           AppPublisher=nokarin
           AppPublisherURL=https://github.com/nokarin-dev/frameextractor
           AppSupportURL=https://github.com/nokarin-dev/frameextractor/issues
-          DefaultDirName={autopf}\FrameExtractor
+          DefaultDirName={localappdata}\FrameExtractor
           DefaultGroupName=Frame Extractor
           AllowNoIcons=yes
           OutputDir=.
@@ -90,6 +90,7 @@ jobs:
           Compression=lzma2/ultra64
           SolidCompression=yes
           WizardStyle=modern
+          PrivilegesRequired=lowest
           PrivilegesRequiredOverridesAllowed=dialog
           UninstallDisplayIcon={app}\frameextractor.exe
           SetupIconFile=windows\runner\resources\app_icon.ico
@@ -104,16 +105,24 @@ jobs:
           Source: "build\windows\x64\runner\Release\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
 
           [Icons]
-          Name: "{group}\Frame Extractor"; Filename: "{app}\frameextractor.exe"
-          Name: "{group}\Uninstall Frame Extractor"; Filename: "{uninstallexe}"
-          Name: "{commondesktop}\Frame Extractor"; Filename: "{app}\frameextractor.exe"; Tasks: desktopicon
+          Name: "{userprograms}\Frame Extractor"; Filename: "{app}\frameextractor.exe"
+          Name: "{userprograms}\Uninstall Frame Extractor"; Filename: "{uninstallexe}"
+          Name: "{userdesktop}\Frame Extractor"; Filename: "{app}\frameextractor.exe"; Tasks: desktopicon
 
           [Run]
           Filename: "{app}\frameextractor.exe"; Description: "{cm:LaunchProgram,Frame Extractor}"; Flags: nowait postinstall skipifsilent
-          "@
+          "@ | Out-File -FilePath "installer.iss" -Encoding UTF8
+          Write-Host "Inno Setup script created for v$version"
 
-          $iss | Out-File -FilePath "installer.iss" -Encoding UTF8
-          Write-Host "Inno Setup script created for version $version"
+      - name: Compile installer (.exe)
+        shell: pwsh
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "installer.iss"
+          if (!(Test-Path "FrameExtractor-windows-installer.exe")) {
+            Write-Error "Installer .exe not produced"
+            exit 1
+          }
+          Write-Host "✓ Installer built: FrameExtractor-windows-installer.exe"
 
       - name: Compile installer with Inno Setup
         shell: pwsh
@@ -469,6 +478,7 @@ jobs:
         with:
           name: "Frame Extractor ${{ github.ref_name }}"
           body: |
+            https://img.shields.io/github/downloads/nokarin-dev/frameextractor/${{ github.ref_name }}/total?style=flat-square&color=3258a8
             ${{ env.CHANGELOG }}
 
             ---
@@ -486,9 +496,8 @@ jobs:
             | 🤖 Android (arm32) | `FrameExtractor-android-arm32.apk` | Older 32-bit phones |
             | 🤖 Android (x86_64) | `FrameExtractor-android-x86_64.apk` | Emulators / Chromebooks |
 
-            > **Windows/Linux/macOS:** ffmpeg & yt-dlp bundled inside the zip/dmg.
+            > **Windows/Linux:** ffmpeg & yt-dlp bundled inside the zip/dmg.
             > **Android:** yt-dlp bundled in APK, ffmpeg via ffmpeg_kit.
-            > **iOS:** ffmpeg via ffmpeg_kit, YouTube via API.
           draft: false
           prerelease: ${{ contains(github.ref_name, '-') }}
           files: |

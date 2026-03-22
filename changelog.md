@@ -12,13 +12,44 @@ This project loosely follows Keep a Changelog and uses Semantic Versioning.
 
 ---
 
-## [1.1.0] - 2026-03-21
-
-This is the first public release of Frame Extractor 🎉  
-It already includes most of the core features across all supported platforms.
+## [1.1.1] - 2026-03-22
+### Fixed
+#### Android
+- Frame extraction now works correctly - ffmpeg output is written to the app's writable directory (`Android/data/com.nokarin.frameextractor/files/`) instead of trying to write directly to `/storage/emulated/0/` which is blocked by Android 10+ Scoped Storage
+- YouTube download now uses the app's cache directory, fixing `Operation not permitted` error when downloading to external storage
+- SAF (Storage Access Framework) URI resolution improved with proper fallback to writable app directory
 
 ### Added
+#### User Interface
+- Mouse cursor changes to pointer on all interactive elements (buttons, chips, sliders, file rows, tabs)
+- Text cursor shown on text input fields
+- Hint bar below Extract button — explains what needs to be selected before extraction can start
+- Clear button on video file and output folder rows for quick reset
+- Hover effect on file/folder rows using `borderHi` color
+- Hover effect on Extract and Cancel buttons (brighter fill on hover)
+- Toast notifications now include an icon (check, error, cancel)
+- Progress card background tinted by phase: blue for extraction, red for YouTube download
+- Log panel: color-coded log lines — `[ERR]` red, `[WARN]` orange, `[INFO]`/`[Android]`/`[Copy]` blue
+- Log line count badge in log panel header
 
+#### Settings & UX
+- All extraction settings (FPS, quality, format, time range) are disabled until video source and output folder are both selected
+- Tooltip on disabled settings card explaining what needs to be selected
+- Source tab switching and YouTube quality chips are disabled during active extraction
+- Advanced options toggle is disabled when settings are not yet unlocked
+- Default output format changed from PNG to JPG (smaller file size)
+- Default quality changed from 100% to 90%
+- "Open folder when done" toggle now has a subtitle description
+
+
+### Changed
+#### UI
+- Progress card is now shown/hidden dynamically instead of always visible
+- Progress card label shows `EXTRACTING` or `DOWNLOADING` depending on the current phase
+- Comment style in source code simplified (no decorative separator lines)
+
+## [1.1.0] - 2026-03-21
+### Added
 #### Core Features
 - Extract frames from local video files with precise start/end time control
 - Adjustable frame rate (1–60 FPS)
@@ -39,9 +70,7 @@ It already includes most of the core features across all supported platforms.
 #### Platform Support
 - Windows (installer + portable)
 - Linux (installer + portable)
-- macOS (DMG + portable ZIP)
 - Android (split APK: arm64, arm32, x86_64)
-- iOS (unsigned IPA for sideloading via AltStore / TrollStore)
 
 #### Bundled Tools
 - ffmpeg and yt-dlp are included by default — no manual installation needed
@@ -81,11 +110,7 @@ Due to Scoped Storage (Android 10+), extracted frames are saved in:
 You can access them via:
 Files → Internal Storage → Android → data → com.nokarin.frameextractor → files
 
-### iOS
-YouTube extraction uses youtube_explode_dart.  
-Running external binaries (like yt-dlp) is not allowed due to Apple's sandbox policy.
-
-### Desktop (Windows / Linux / macOS)
+### Desktop (Windows / Linux)
 ffmpeg and yt-dlp are bundled inside the app.
 
 On first launch, required binaries are extracted to:
