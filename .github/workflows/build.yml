@@ -299,20 +299,15 @@ jobs:
       - name: Build macOS installer
         run: flutter build macos --release --dart-define=PORTABLE=false
 
-      - name: Inject binaries (installer)
+      - name: Inject & sign binaries (installer)
         run: |
           APP="build/macos/Build/Products/Release/frameextractor.app"
           mkdir -p "$APP/Contents/MacOS/bin"
-          cp assets/binaries/macos/ffmpeg "$APP/Contents/MacOS/bin/"
-          cp assets/binaries/macos/yt-dlp "$APP/Contents/MacOS/bin/"
+          cp assets/binaries/macos/ffmpeg  "$APP/Contents/MacOS/bin/"
+          cp assets/binaries/macos/yt-dlp  "$APP/Contents/MacOS/bin/"
           chmod +x "$APP/Contents/MacOS/bin/"*
-
-      - name: Sign bundled binaries (installer)
-        run: |
-          APP="build/macos/Build/Products/Release/frameextractor.app"
-          for BIN in "$APP/Contents/MacOS/bin/"*; do
-            codesign --force --deep --sign - "$BIN"
-          done
+          codesign --force --deep --sign - "$APP/Contents/MacOS/bin/ffmpeg"
+          codesign --force --deep --sign - "$APP/Contents/MacOS/bin/yt-dlp"
 
       - name: Package installer (dmg)
         run: |
@@ -324,13 +319,15 @@ jobs:
       - name: Build macOS (portable)
         run: flutter build macos --release --dart-define=PORTABLE=true
 
-      - name: Inject binaries — portable
+      - name: Inject & sign binaries (portable)
         run: |
           APP="build/macos/Build/Products/Release/frameextractor.app"
           mkdir -p "$APP/Contents/MacOS/bin"
-          cp assets/binaries/macos/ffmpeg "$APP/Contents/MacOS/bin/"
-          cp assets/binaries/macos/yt-dlp "$APP/Contents/MacOS/bin/"
+          cp assets/binaries/macos/ffmpeg  "$APP/Contents/MacOS/bin/"
+          cp assets/binaries/macos/yt-dlp  "$APP/Contents/MacOS/bin/"
           chmod +x "$APP/Contents/MacOS/bin/"*
+          codesign --force --deep --sign - "$APP/Contents/MacOS/bin/ffmpeg"
+          codesign --force --deep --sign - "$APP/Contents/MacOS/bin/yt-dlp"
 
       - name: Package portable (zip)
         run: |
@@ -358,78 +355,9 @@ jobs:
           flutter-version: "3.x"
           channel: stable
           cache: true
-
       - run: flutter pub get
 
-      - name: Patch ffmpeg_kit podspec deployment target
-        run: |
-          # ffmpeg_kit_flutter_new podspec reports incorrect minimum deployment
-          # target — patch it directly so CocoaPods can resolve dependencies
-          PODSPEC=$(find "$HOME/.pub-cache" \
-            -path "*/ffmpeg_kit_flutter_new*/*.podspec" 2>/dev/null | head -1)
-          if [ -z "$PODSPEC" ]; then
-            PODSPEC=$(find . \
-              -path "*/.symlinks/plugins/ffmpeg_kit_flutter_new/ios/*.podspec" \
-              2>/dev/null | head -1)
-          fi
-          if [ -n "$PODSPEC" ]; then
-            echo "Patching: $PODSPEC"
-            python3 -c "
-              import re, sys
-              f = open('$PODSPEC').read()
-              f = re.sub(r\"s\\.ios\\.deployment_target\\s*=\\s*'[0-9.]+'\",
-              \"s.ios.deployment_target = '13.0'\", f)
-              f = re.sub(r\"s\\.deployment_target\\s*=\\s*'[0-9.]+'\",
-              \"s.deployment_target = '13.0'\", f)
-              open('$PODSPEC', 'w').write(f)
-              print('done')
-            "
-          else
-            echo "podspec not found in pub cache — will attempt build anyway"
-          fi
-
-          # Also patch xcodeproj
-          PBXPROJ="ios/Runner.xcodeproj/project.pbxproj"
-          if [ -f "$PBXPROJ" ]; then
-            python3 -c "
-              import re
-              f = open('$PBXPROJ').read()
-              f = re.sub(r'IPHONEOS_DEPLOYMENT_TARGET = [0-9.]+',
-              'IPHONEOS_DEPLOYMENT_TARGET = 13.0', f)
-              open('$PBXPROJ', 'w').write(f)
-              print('xcodeproj patched')
-            "
-          fi
-
-      - name: Import signing certificate
-        env:
-          IOS_CERT: ${{ secrets.IOS_CERTIFICATE_BASE64 }}
-        if: env.IOS_CERT != ''
-        run: |
-          echo "${{ secrets.IOS_CERTIFICATE_BASE64 }}" | base64 -d > /tmp/cert.p12
-          security create-keychain -p "" build.keychain
-          security import /tmp/cert.p12 -k build.keychain \
-            -P "${{ secrets.IOS_CERTIFICATE_PASSWORD }}" -T /usr/bin/codesign
-          security list-keychains -s build.keychain
-          security set-keychain-settings build.keychain
-          security unlock-keychain -p "" build.keychain
-          echo "${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}" | base64 -d \
-            > ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision
-
-      - name: Build iOS (signed)
-        env:
-          IOS_CERT: ${{ secrets.IOS_CERTIFICATE_BASE64 }}
-        if: env.IOS_CERT != ''
-        run: |
-          flutter build ipa --release \
-            --dart-define=PORTABLE=false \
-            --export-options-plist=ios/ExportOptions.plist
-          cp build/ios/ipa/*.ipa FrameExtractor-ios.ipa
-
-      - name: Build iOS (unsigned — sideload)
-        env:
-          IOS_CERT: ${{ secrets.IOS_CERTIFICATE_BASE64 }}
-        if: env.IOS_CERT == ''
+      - name: Build iOS
         run: |
           flutter build ios --release --no-codesign --dart-define=PORTABLE=false
           mkdir -p Payload
