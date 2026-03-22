@@ -145,7 +145,7 @@ jobs:
         with:
           name: windows-builds
           path: |
-            FrameExtractor-windows-installer.zip
+            FrameExtractor-windows-installer.exe
             FrameExtractor-windows-portable.zip
 
   #.Linux
