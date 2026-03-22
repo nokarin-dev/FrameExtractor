@@ -358,6 +358,13 @@ jobs:
           cp assets/binaries/macos/yt-dlp "$APP/Contents/MacOS/bin/"
           chmod +x "$APP/Contents/MacOS/bin/"*
 
+      - name: Sign bundled binaries (installer)
+        run: |
+          APP="build/macos/Build/Products/Release/frameextractor.app"
+          for BIN in "$APP/Contents/MacOS/bin/"*; do
+            codesign --force --deep --sign - "$BIN"
+          done
+
       - name: Package installer (dmg)
         run: |
           hdiutil create -volname "FrameExtractor" \
