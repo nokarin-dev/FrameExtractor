@@ -286,10 +286,26 @@ jobs:
           mkdir -p AppDir/usr/share/applications
           mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
 
+          # Detect executable name (may be FrameExtractor or frameextractor)
+          EXE=$(find "$BUNDLE" -maxdepth 1 -type f ! -name "*.so" ! -name "*.desktop" | head -1)
+          EXE_NAME=$(basename "$EXE")
+          echo "Detected executable: $EXE_NAME"
+
           # Copy app files
-          cp "$BUNDLE/frameextractor" AppDir/usr/bin/
-          cp -r "$BUNDLE/lib/"* AppDir/usr/lib/ 2>/dev/null || true
-          cp -r "$BUNDLE/data"   AppDir/usr/    2>/dev/null || true
+          cp "$EXE" AppDir/usr/bin/frameextractor
+          chmod +x AppDir/usr/bin/frameextractor
+
+          # Copy shared libraries
+          if [ -d "$BUNDLE/lib" ]; then
+            cp -r "$BUNDLE/lib/"* AppDir/usr/lib/ 2>/dev/null || true
+          fi
+
+          # Copy data directory
+          if [ -d "$BUNDLE/data" ]; then
+            cp -r "$BUNDLE/data" AppDir/usr/
+          fi
+
+          # Copy bundled binaries
           mkdir -p AppDir/usr/bin/bin
           cp "$BUNDLE/bin/ffmpeg"  AppDir/usr/bin/bin/
           cp "$BUNDLE/bin/yt-dlp" AppDir/usr/bin/bin/
