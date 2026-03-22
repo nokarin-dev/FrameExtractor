@@ -1,7 +1,7 @@
 name: frameextractor
 description: "FrameExtractor is a modern, cross-platform video frame extractor with a beautiful GUI built using Flutter and FFmpeg."
 
-version: 1.1.0
+version: 1.1.2
 
 environment:
   sdk: ^3.10.4
@@ -46,4 +46,5 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-  assets: []
+  assets:
+    - assets/icons/

@@ -68,6 +68,15 @@ jobs:
           Copy-Item "assets\binaries\windows\ffmpeg.exe" $dest
           Copy-Item "assets\binaries\windows\yt-dlp.exe" $dest
 
+      - name: Generate app_icon.ico from PNG
+        shell: pwsh
+        run: |
+          magick convert `
+            assets/icons/icon_256.png `
+            -define icon:auto-resize=256,128,64,48,32,16 `
+            windows/runner/resources/app_icon.ico
+          Write-Host "✓ app_icon.ico generated"
+
       - name: Create Inno Setup script
         shell: pwsh
         run: |
@@ -127,7 +136,6 @@ jobs:
       - name: Compile installer with Inno Setup
         shell: pwsh
         run: |
-          # Inno Setup is pre-installed on GitHub Actions Windows runners
           $inno = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
           & $inno "installer.iss"
           Write-Host "Installer compiled: FrameExtractor-windows-installer.exe"
@@ -242,8 +250,8 @@ jobs:
           DESKTOP
 
           # App icon
-          if [ -f "assets/icon.png" ]; then
-            cp "assets/icon.png" "$PKG/usr/share/icons/hicolor/256x256/apps/frameextractor.png"
+          if [ -f "assets/icons/icon_256.png" ]; then
+            cp "assets/icons/icon_256.png" "$PKG/usr/share/icons/hicolor/256x256/apps/frameextractor.png"
           fi
 
           # DEBIAN/control
@@ -261,7 +269,6 @@ jobs:
           Homepage: https://github.com/nokarin-dev/frameextractor
           EOF
 
-          # post-install script
           cat > "$PKG/DEBIAN/postinst" << 'POSTINST'
           #!/bin/sh
           chmod +x /opt/frameextractor/frameextractor 2>/dev/null || true
@@ -287,9 +294,6 @@ jobs:
           dpkg-deb --info "FrameExtractor-linux-installer.deb"
 
       # AppImage package
-      - name: Install FUSE
-        run: sudo apt-get install -y libfuse2
-
       - name: Build .AppImage
         run: |
           BUNDLE="build/linux/x64/release/bundle"
@@ -314,9 +318,9 @@ jobs:
           echo "Detected executable: $EXE_NAME"
 
           # App icon
-          if [ -f "assets/icon.png" ]; then
-            cp "assets/icon.png" AppDir/usr/share/icons/hicolor/256x256/apps/frameextractor.png
-            cp "assets/icon.png" AppDir/frameextractor.png
+          if [ -f "assets/icons/icon_256.png" ]; then
+            cp "assets/icons/icon_256.png" AppDir/usr/share/icons/hicolor/256x256/apps/frameextractor.png
+            cp "assets/icons/icon_64.png" AppDir/frameextractor.png
           else
             printf 'PNG' > AppDir/frameextractor.png
           fi
@@ -342,8 +346,14 @@ jobs:
 
           export LD_LIBRARY_PATH="$APPDIR/app/lib:$LD_LIBRARY_PATH"
 
+          EXE=$(find "$APPDIR/app" -maxdepth 1 -type f ! -name "*.so" | head -1)
+          if [ -z "$EXE" ]; then
+            echo "FrameExtractor: could not find executable in $APPDIR/app/" >&2
+            exit 1
+          fi
+
           cd "$APPDIR/app"
-          exec "./$EXE_NAME" "$@"
+          exec "./$EXE" "$@"
           APPRUN
           chmod +x AppDir/AppRun
 
@@ -478,7 +488,7 @@ jobs:
         with:
           name: "Frame Extractor ${{ github.ref_name }}"
           body: |
-            https://img.shields.io/github/downloads/nokarin-dev/frameextractor/${{ github.ref_name }}/total?style=flat-square&color=3258a8
+            ![latest download](https://img.shields.io/github/downloads/nokarin-dev/frameextractor/${{ github.ref_name }}/total?style=flat-square&color=3258a8)
             ${{ env.CHANGELOG }}
 
             ---

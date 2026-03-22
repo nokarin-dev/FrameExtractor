@@ -7,8 +7,12 @@ This project loosely follows Keep a Changelog and uses Semantic Versioning.
 ---
 
 ## [Unreleased]
+### Fixed
+#### CI/CD
+- Fixed Linux AppImage launch error `Is a directory` - `$EXE_NAME` was set in CI shell but not expanded inside the AppRun heredoc (single-quoted heredoc prevents variable substitution). AppRun now detects the executable at runtime using `find`
 
-(No changes yet)
+#### Added
+- Application Icons
 
 ---
 
