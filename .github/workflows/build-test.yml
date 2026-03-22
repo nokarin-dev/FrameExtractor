@@ -22,7 +22,6 @@ permissions:
   pull-requests: write
 
 jobs:
-
   analyze:
     name: Analyze & Test
     runs-on: ubuntu-latest
@@ -138,34 +137,6 @@ jobs:
             Write-Error "✗ Not found: $exe"; exit 1
           }
 
-  test-macos:
-    name: Build Test — macOS
-    needs: [analyze, prepare-dummy-binaries]
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Download dummy binaries
-        uses: actions/download-artifact@v4
-        with:
-          name: dummy-binaries
-          path: assets/binaries
-
-      - uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.x'
-          channel: stable
-          cache: true
-      - run: flutter pub get
-
-      - name: Build macOS (debug)
-        run: flutter build macos --debug --dart-define=PORTABLE=false
-
-      - name: Verify build output
-        run: |
-          APP="build/macos/Build/Products/Debug/frameextractor.app"
-          [ -d "$APP" ] && echo "✓ macOS OK" || (echo "✗ Not found: $APP" && exit 1)
-
   test-android:
     name: Build Test — Android
     needs: [analyze, prepare-dummy-binaries]
@@ -199,35 +170,9 @@ jobs:
           APK="build/app/outputs/flutter-apk/app-debug.apk"
           [ -f "$APK" ] && echo "✓ Android OK — $(du -h $APK | cut -f1)" || (echo "✗ APK not found" && exit 1)
 
-  test-ios:
-    name: Build Test — iOS
-    needs: analyze
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.x'
-          channel: stable
-          cache: true
-      - run: flutter pub get
-
-      - name: Build iOS
-        run: |
-          flutter build ios \
-            --debug \
-            --no-codesign \
-            --dart-define=PORTABLE=false
-
-      - name: Verify .app bundle exists
-        run: |
-          APP=$(find build/ios -name "*.app" -maxdepth 4 | head -1)
-          [ -n "$APP" ] && echo "✓ iOS OK — $APP" || (echo "✗ no .app found" && exit 1)
-
   all-tests-pass:
     name: All build tests passed
-    needs: [analyze, test-linux, test-windows, test-macos, test-android, test-ios]
+    needs: [analyze, test-linux, test-windows, test-android]
     runs-on: ubuntu-latest
     if: always()
     steps:
@@ -236,16 +181,12 @@ jobs:
           echo "analyze:      ${{ needs.analyze.result }}"
           echo "test-linux:   ${{ needs.test-linux.result }}"
           echo "test-windows: ${{ needs.test-windows.result }}"
-          echo "test-macos:   ${{ needs.test-macos.result }}"
           echo "test-android: ${{ needs.test-android.result }}"
-          echo "test-ios:     ${{ needs.test-ios.result }}"
           if [[ \
             "${{ needs.analyze.result }}"      == "success" && \
             "${{ needs.test-linux.result }}"   == "success" && \
             "${{ needs.test-windows.result }}" == "success" && \
-            "${{ needs.test-macos.result }}"   == "success" && \
             "${{ needs.test-android.result }}" == "success" && \
-            "${{ needs.test-ios.result }}"     == "success" \
           ]]; then
             echo "✅ All build tests passed."
           else

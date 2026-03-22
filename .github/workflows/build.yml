@@ -274,109 +274,10 @@ jobs:
             FrameExtractor-android-arm32.apk
             FrameExtractor-android-x86_64.apk
 
-  # macOS
-  build-macos:
-    name: macOS
-    needs: prepare-binaries
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: binaries
-          path: assets/binaries
-
-      - uses: subosito/flutter-action@v2
-        with:
-          flutter-version: "3.x"
-          channel: stable
-          cache: true
-
-      - run: flutter pub get
-
-      # Installer
-      - name: Build macOS installer
-        run: flutter build macos --release --dart-define=PORTABLE=false
-
-      - name: Inject & sign binaries (installer)
-        run: |
-          APP="build/macos/Build/Products/Release/frameextractor.app"
-          mkdir -p "$APP/Contents/MacOS/bin"
-          cp assets/binaries/macos/ffmpeg  "$APP/Contents/MacOS/bin/"
-          cp assets/binaries/macos/yt-dlp  "$APP/Contents/MacOS/bin/"
-          chmod +x "$APP/Contents/MacOS/bin/"*
-          codesign --force --deep --sign - "$APP/Contents/MacOS/bin/ffmpeg"
-          codesign --force --deep --sign - "$APP/Contents/MacOS/bin/yt-dlp"
-
-      - name: Package installer (dmg)
-        run: |
-          hdiutil create -volname "FrameExtractor" \
-            -srcfolder "build/macos/Build/Products/Release/frameextractor.app" \
-            -ov -format UDZO "FrameExtractor-macos-installer.dmg"
-
-      # Portable
-      - name: Build macOS (portable)
-        run: flutter build macos --release --dart-define=PORTABLE=true
-
-      - name: Inject & sign binaries (portable)
-        run: |
-          APP="build/macos/Build/Products/Release/frameextractor.app"
-          mkdir -p "$APP/Contents/MacOS/bin"
-          cp assets/binaries/macos/ffmpeg  "$APP/Contents/MacOS/bin/"
-          cp assets/binaries/macos/yt-dlp  "$APP/Contents/MacOS/bin/"
-          chmod +x "$APP/Contents/MacOS/bin/"*
-          codesign --force --deep --sign - "$APP/Contents/MacOS/bin/ffmpeg"
-          codesign --force --deep --sign - "$APP/Contents/MacOS/bin/yt-dlp"
-
-      - name: Package portable (zip)
-        run: |
-          ditto -c -k --sequesterRsrc --keepParent \
-            "build/macos/Build/Products/Release/frameextractor.app" \
-            "FrameExtractor-macos-portable.zip"
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: macos-builds
-          path: |
-            FrameExtractor-macos-installer.dmg
-            FrameExtractor-macos-portable.zip
-
-  # iOS
-  build-ios:
-    name: iOS
-    needs: prepare-binaries
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: subosito/flutter-action@v2
-        with:
-          flutter-version: "3.x"
-          channel: stable
-          cache: true
-      - run: flutter pub get
-
-      - name: Build iOS
-        run: |
-          flutter build ios --release --no-codesign --dart-define=PORTABLE=false
-          mkdir -p Payload
-          cp -r build/ios/Release-iphoneos/Runner.app Payload/
-          zip -r FrameExtractor-ios-unsigned.ipa Payload/
-          rm -rf Payload
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: ios-build
-          path: |
-            FrameExtractor-ios.ipa
-            FrameExtractor-ios-unsigned.ipa
-        if: always()
-
   # Release
   release:
     name: Create Release
-    needs: [build-windows, build-linux, build-android, build-macos, build-ios]
+    needs: [build-windows, build-linux, build-android]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -429,12 +330,9 @@ jobs:
             | 🪟 Windows Portable | `FrameExtractor-windows-portable.zip` | No install needed |
             | 🐧 Linux | `FrameExtractor-linux-installer.tar.gz` | Extract & run |
             | 🐧 Linux Portable | `FrameExtractor-linux-portable.tar.gz` | Self-contained folder |
-            | 🍎 macOS | `FrameExtractor-macos-installer.dmg` | Open dmg & drag to Applications |
-            | 🍎 macOS Portable | `FrameExtractor-macos-portable.zip` | Extract & run anywhere |
             | 🤖 Android (arm64) | `FrameExtractor-android-arm64.apk` | Most modern phones (2018+) |
             | 🤖 Android (arm32) | `FrameExtractor-android-arm32.apk` | Older 32-bit phones |
             | 🤖 Android (x86_64) | `FrameExtractor-android-x86_64.apk` | Emulators / Chromebooks |
-            | 📱 iOS | `FrameExtractor-ios.ipa` / `FrameExtractor-ios-unsigned.ipa` | Sideload via AltStore/TrollStore |
 
             > **Windows/Linux/macOS:** ffmpeg & yt-dlp bundled inside the zip/dmg.
             > **Android:** yt-dlp bundled in APK, ffmpeg via ffmpeg_kit.
@@ -446,11 +344,7 @@ jobs:
             dist/FrameExtractor-windows-portable.zip
             dist/FrameExtractor-linux-installer.tar.gz
             dist/FrameExtractor-linux-portable.tar.gz
-            dist/FrameExtractor-macos-installer.dmg
-            dist/FrameExtractor-macos-portable.zip
             dist/FrameExtractor-android-arm64.apk
             dist/FrameExtractor-android-arm32.apk
             dist/FrameExtractor-android-x86_64.apk
-            dist/FrameExtractor-ios.ipa
-            dist/FrameExtractor-ios-unsigned.ipa
           token: ${{ secrets.GITHUB_TOKEN }}

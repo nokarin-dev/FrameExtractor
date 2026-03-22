@@ -32,7 +32,7 @@
 - 🗂️ **Auto open folder** when extraction completes
 - 📋 **Live process log** - view ffmpeg/yt-dlp output in real time, copy to clipboard
 - 🔋 **Batteries included** - ffmpeg & yt-dlp bundled, no manual installation needed
-- 🖥️ **Cross-platform** - Windows, Linux, macOS, Android, iOS
+- 🖥️ **Cross-platform** - Windows, Linux, Android
 
 ---
 
@@ -46,10 +46,7 @@ Head to the [**Releases**](https://github.com/nokarin-dev/frameextractor/release
 | 🪟 Windows Portable | `FrameExtractor-windows-portable.zip`   | No installation needed                                                                             |
 | 🐧 Linux            | `FrameExtractor-linux-installer.tar.gz` | Extract & run                                                                                      |
 | 🐧 Linux Portable   | `FrameExtractor-linux-portable.tar.gz`  | Self-contained folder                                                                              |
-| 🍎 macOS            | `FrameExtractor-macos-installer.dmg`    | Open & drag to Applications                                                                        |
-| 🍎 macOS Portable   | `FrameExtractor-macos-portable.zip`     | Extract & run anywhere                                                                             |
 | 🤖 Android          | `FrameExtractor-android.apk`            | Enable "Install unknown apps" in settings                                                          |
-| 📱 iOS              | `FrameExtractor-ios-unsigned.ipa`       | Sideload via [AltStore](https://altstore.io) or [TrollStore](https://github.com/opa334/TrollStore) |
 
 > **Note (iOS):** Due to Apple sandbox restrictions, yt-dlp cannot run as a binary on iOS. The YouTube feature uses an API fallback instead.
 
@@ -96,9 +93,7 @@ flutter build linux --release --dart-define=PORTABLE=false # installer
 flutter build linux --release --dart-define=PORTABLE=true # portable
 flutter build windows --release --dart-define=PORTABLE=false
 flutter build windows --release --dart-define=PORTABLE=true
-flutter build macos --release
 flutter build apk --release # Android
-flutter build ipa --release # iOS (requires Apple signing)
 ```
 
 ### Installer vs Portable (Windows & Linux)
@@ -116,8 +111,6 @@ flutter build ipa --release # iOS (requires Apple signing)
 | Windows  | ✅      |
 | Linux    | ✅      |
 | Android  | ✅      |
-| iOS      | ❌      |
-| macOS    | ❌      |
 
 ## License
 
