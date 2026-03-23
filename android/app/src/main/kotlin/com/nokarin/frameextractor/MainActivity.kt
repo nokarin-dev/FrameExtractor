@@ -1,9 +1,9 @@
 package com.nokarin.frameextractor
 
-import android.net.Uri
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import androidx.core.net.toUri
 
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.nokarin.frameextractor/native"
@@ -25,7 +25,7 @@ class MainActivity : FlutterActivity() {
                             return@setMethodCallHandler
                         }
                         try {
-                            val uri = Uri.parse(uriString)
+                            val uri = uriString.toUri()
                             val path = UriHelper.getPathFromUri(this, uri)
                             result.success(path)
                         } catch (e: Exception) {
@@ -40,15 +40,15 @@ class MainActivity : FlutterActivity() {
                     }
 
                     "copyFramesToUri" -> {
-                        val sourceDir   = call.argument<String>("sourceDir")
-                        val targetUri   = call.argument<String>("targetUri")
-                        val subfolder   = call.argument<String>("subfolder")
+                        val sourceDir = call.argument<String>("sourceDir")
+                        val targetUri = call.argument<String>("targetUri")
+                        val subfolder = call.argument<String>("subfolder")
                         if (sourceDir == null || targetUri == null) {
                             result.error("INVALID_ARGS", "sourceDir and targetUri required", null)
                             return@setMethodCallHandler
                         }
                         try {
-                            val uri = android.net.Uri.parse(targetUri)
+                            val uri = targetUri.toUri()
                             val count = MediaStoreHelper.copyFramesToUri(
                                 this, sourceDir, uri, subfolder
                             )

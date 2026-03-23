@@ -14,6 +14,10 @@ This project loosely follows Keep a Changelog and uses Semantic Versioning.
 #### Added
 - Application Icons
 
+### Changes
+#### Android
+- Upgrade android plugins to latest version
+
 ---
 
 ## [1.1.1] - 2026-03-22
@@ -126,5 +130,6 @@ On first launch, required binaries are extracted to:
 
 ---
 
-[Unreleased]: https://github.com/nokarin-dev/frameextractor/compare/v1.0.0...HEAD
-[1.0.0]: https://github.com/nokarin-dev/frameextractor/releases/tag/v1.0.0
+[Unreleased]: https://github.com/nokarin-dev/frameextractor/compare/v1.1.1...HEAD
+[1.1.1]: https://github.com/nokarin-dev/frameextractor/releases/tag/v1.1.1
+[1.1.0]: https://github.com/nokarin-dev/frameextractor/releases/tag/v1.1.0

@@ -5,7 +5,6 @@ import android.net.Uri
 import android.provider.DocumentsContract
 import android.provider.MediaStore
 import android.os.Environment
-import java.io.File
 
 object UriHelper {
     fun getPathFromUri(context: Context, uri: Uri): String? {
@@ -50,7 +49,7 @@ object UriHelper {
                     "$storageDir/$relativePath"
                 }
             }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             null
         }
     }
@@ -69,7 +68,7 @@ object UriHelper {
                     "${Environment.getExternalStorageDirectory()}/$relativePath"
                 else -> queryContentPath(context, uri)
             }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             queryContentPath(context, uri)
         }
     }
@@ -85,7 +84,7 @@ object UriHelper {
                     if (idx >= 0) cursor.getString(idx) else null
                 } else null
             }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             null
         }
     }

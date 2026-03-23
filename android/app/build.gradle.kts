@@ -1,3 +1,5 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 plugins {
     id("com.android.application")
     id("kotlin-android")
@@ -14,8 +16,10 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
+    kotlin {
+        compilerOptions {
+            jvmTarget = JvmTarget.JVM_17
+        }
     }
 
     defaultConfig {
@@ -37,9 +41,9 @@ androidComponents {
     onVariants { variant ->
         variant.outputs.forEach { output ->
             val abiCodes = mapOf(
-                "arm64-v8a"   to 1,
+                "arm64-v8a" to 1,
                 "armeabi-v7a" to 2,
-                "x86_64"      to 3,
+                "x86_64" to 3,
             )
             if (output is com.android.build.api.variant.impl.VariantOutputImpl) {
                 val abi = output.filters.find {
@@ -56,7 +60,7 @@ androidComponents {
 }
 
 dependencies {
-    implementation("androidx.documentfile:documentfile:1.0.1")
+    implementation("androidx.documentfile:documentfile:1.1.0")
 }
 
 flutter {

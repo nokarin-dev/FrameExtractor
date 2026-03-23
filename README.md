@@ -7,22 +7,20 @@
 [![Release](https://img.shields.io/github/v/release/nokarin-dev/frameextractor?style=flat-square&color=4F8EF7)](https://github.com/nokarin-dev/frameextractor/releases/latest)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg?style=flat-square)](LICENSE)
 [![Flutter](https://img.shields.io/badge/Flutter-3.22-02569B?style=flat-square&logo=flutter)](https://flutter.dev)
-[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS%20%7C%20Android%20%7C%20iOS-02569B?style=flat-square)](#download)
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20Android-02569B?style=flat-square)](#download)
+
 [![Total Downloads](https://img.shields.io/github/downloads/nokarin-dev/frameextractor/total?style=flat-square&logoColor=%3D&color=3471eb
 )](/releases)
 [![Latest Downloads](https://img.shields.io/github/downloads/nokarin-dev/frameextractor/latest/total?style=flat-square&color=3d47d4
 )](/releases/latest)
 [![Test Status](https://img.shields.io/github/actions/workflow/status/nokarin-dev/frameextractor/build-test.yml?style=flat-square&label=test%20build&color=22316e
 )](https://github.com/nokarin-dev/FrameExtractor/actions/workflows/build-test.yml)
-[![Release Status](https://img.shields.io/github/actions/workflow/status/nokarin-dev/frameextractor/build.yml?style=flat-square&label=release%20build&color=22316e
-)](https://github.com/nokarin-dev/FrameExtractor/actions/workflows/build.yml)
 
 </div>
 
 ---
 
 ## Features
-
 - 🎬 **Extract frames** from any local video file with precise start/end timestamps
 - 📺 **YouTube support** - paste a URL, pick quality, extract directly (yt-dlp powered)
 - ⚡ **Adjustable FPS** - from 1 to 60 frames per second
@@ -37,31 +35,27 @@
 ---
 
 ## Download
-
 Head to the [**Releases**](https://github.com/nokarin-dev/frameextractor/releases/latest) page and grab the build for your platform.
 
-| Platform            | File                                    | Notes                                                                                              |
-|---------------------|-----------------------------------------|----------------------------------------------------------------------------------------------------|
-| 🪟 Windows          | `FrameExtractor-windows-installer.zip`  | Extract & run `.exe`                                                                               |
-| 🪟 Windows Portable | `FrameExtractor-windows-portable.zip`   | No installation needed                                                                             |
-| 🐧 Linux            | `FrameExtractor-linux-installer.tar.gz` | Extract & run                                                                                      |
-| 🐧 Linux Portable   | `FrameExtractor-linux-portable.tar.gz`  | Self-contained folder                                                                              |
-| 🤖 Android          | `FrameExtractor-android.apk`            | Enable "Install unknown apps" in settings                                                          |
-
-> **Note (iOS):** Due to Apple sandbox restrictions, yt-dlp cannot run as a binary on iOS. The YouTube feature uses an API fallback instead.
+| Platform            | File                                    | Notes                                                       |
+|---------------------|-----------------------------------------|-------------------------------------------------------------|
+| 🪟 Windows          | `FrameExtractor-windows-installer.zip`  | Extract & run `.exe`                                        |
+| 🪟 Windows Portable | `FrameExtractor-windows-portable.zip`   | No installation needed                                      |
+| 🐧 Linux            | `FrameExtractor-linux-installer.tar.gz` | Extract & run                                               |
+| 🐧 Linux Portable   | `FrameExtractor-linux-portable.tar.gz`  | Self-contained folder                                       |
+| 🤖 Android          | `FrameExtractor-android-arm32.apk`      | Enable "Install unknown apps" in settings (For older phone) |
+| 🤖 Android          | `FrameExtractor-android-arm64.apk`      | Enable "Install unknown apps" in settings                   |
+| 🤖 Android          | `FrameExtractor-android-x86_64.apk`     | Emulators / Chromebooks                                     |
 
 ---
 
 ## Building from source
-
 ### Prerequisites
-
 - [Flutter 3.22+](https://docs.flutter.dev/get-started/install)
 - Python 3.8+ (for the binary download script)
 - Git
 
 ### 1. Clone & install dependencies
-
 ```bash
 git clone https://github.com/nokarin-dev/frameextractor.git
 cd frameextractor
@@ -69,7 +63,6 @@ flutter pub get
 ```
 
 ### 2. Download bundled binaries
-
 The app bundles ffmpeg and yt-dlp. Run the script to download them for your target platform:
 
 ```bash
@@ -83,7 +76,6 @@ python3 scripts/prepare_binaries.py --all
 > Sources: [ffmpeg (BtbN builds)](https://github.com/BtbN/FFmpeg-Builds/releases) · [yt-dlp](https://github.com/yt-dlp/yt-dlp/releases)
 
 ### 3. Run / Build
-
 ```bash
 # Debug run
 flutter run -d linux # or windows / macos / android / ios
@@ -97,7 +89,6 @@ flutter build apk --release # Android
 ```
 
 ### Installer vs Portable (Windows & Linux)
-
 |                      | Installer                                                              | Portable                  |
 |----------------------|------------------------------------------------------------------------|---------------------------|
 | Binary location      | `AppData/Local/FrameExtractor/bin/` (Win) or `~/.local/share/` (Linux) | Same folder as executable |
@@ -113,7 +104,6 @@ flutter build apk --release # Android
 | Android  | ✅      |
 
 ## License
-
 ```
 FrameExtractor
 Copyright © 2025-2026 nokarin-dev
