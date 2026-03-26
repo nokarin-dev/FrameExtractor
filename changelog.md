@@ -7,8 +7,8 @@ This project loosely follows Keep a Changelog and uses Semantic Versioning.
 ---
 
 ## [Unreleased]
-
-No Changes Yet.
+### Changed
+- New FrameExtractor Application Icon
 
 ---
 ## [1.1.2] - 2026-03-26
@@ -16,7 +16,8 @@ No Changes Yet.
 #### CI/CD
 - Fixed Linux AppImage launch error `Is a directory` - `$EXE_NAME` was set in CI shell but not expanded inside the AppRun heredoc (single-quoted heredoc prevents variable substitution). AppRun now detects the executable at runtime using `find`
 
-#### Added
+### Added
+#### Core
 - Style Switcher
     - Classic Style (Default)
     - Liquid Glass Style (EXPERIMENTAL)
@@ -30,9 +31,11 @@ No Changes Yet.
     - Ctrl+S (Open Settings Panel)
 - Application Icons
 
-### Changes
+### Changed
 #### Android
 - Upgrade android plugins to latest version
+
+#### User Interface
 - Log & Settings now show as dialog in desktop
 - Splash Screen now following current theme & style
 
