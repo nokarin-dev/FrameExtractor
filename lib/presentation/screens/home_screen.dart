@@ -1,42 +1,27 @@
 import 'dart:io';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:window_manager/window_manager.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
+import 'package:frameextractor/core/app_constants.dart';
+import 'package:frameextractor/core/app_prefs.dart';
 import 'package:frameextractor/data/models/extraction_params.dart';
 import 'package:frameextractor/data/services/youtube_service.dart';
 import 'package:frameextractor/presentation/bloc/extraction_bloc.dart';
 import 'package:frameextractor/presentation/bloc/extraction_event.dart';
 import 'package:frameextractor/presentation/bloc/extraction_state.dart';
-
-// Color palette
-class _C {
-  static const bg = Color(0xFF080A0F);
-  static const surface = Color(0xFF0F1219);
-  static const surfaceHi = Color(0xFF161B27);
-  static const border = Color(0xFF1E2535);
-  static const borderHi = Color(0xFF2A3347);
-  static const accent = Color(0xFF4F8EF7);
-  static const accentDim = Color(0xFF1A2E5A);
-  static const green = Color(0xFF2ECC71);
-  static const greenDim = Color(0xFF0D3320);
-  static const red = Color(0xFFE74C3C);
-  static const redDim = Color(0xFF3A1010);
-  static const orange = Color(0xFFF39C12);
-  static const purple = Color(0xFF9B6EF7);
-  static const textPri = Color(0xFFEDF0F7);
-  static const textSec = Color(0xFF6B7594);
-  static const textMuted = Color(0xFF2E3547);
-  static const ytRed = Color(0xFFFF3B30);
-  static const disabled = Color(0xFF1A1F2E);
-}
+import 'package:frameextractor/presentation/theme/app_theme.dart';
 
 enum _SourceMode { local, youtube }
 
-// Main screen
+bool get _isDesktop => !Platform.isAndroid && !Platform.isIOS;
+
+// HomeScreen
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
   @override
@@ -46,28 +31,31 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen>
     with SingleTickerProviderStateMixin {
   final _ytUrlCtrl = TextEditingController();
-  final _startTimeCtrl = TextEditingController(text: '00:00:00');
-  final _endTimeCtrl = TextEditingController(text: '00:00:05');
+  final _startTimeCtrl = TextEditingController(text: AppConstants.defaultStart);
+  final _endTimeCtrl = TextEditingController(text: AppConstants.defaultEnd);
   late AnimationController _pulseCtrl;
   late Animation<double> _pulseAnim;
 
   _SourceMode _sourceMode = _SourceMode.local;
   String? _videoPath;
   String? _outputDirectory;
-  int _fps = 30;
-  String _format = 'jpg';
-  int _quality = 90;
-  double _scale = 1.0;
+  int _fps = AppConstants.defaultFps;
+  String _format = AppConstants.defaultFormat;
+  int _quality = AppConstants.defaultQuality;
+  double _scale = AppConstants.defaultScale;
   YouTubeQuality _ytQuality = YouTubeQuality.p1080;
   bool _ytInfoLoading = false;
   YouTubeVideoInfo? _ytInfo;
   bool _showAdvanced = false;
   bool _openFolderOnDone = true;
-  String _framePrefix = 'frame_';
+  String _framePrefix = AppConstants.defaultPrefix;
+  List<String> _recentVideos = [];
+
+  bool get _isExtracting =>
+      context.read<ExtractionBloc>().state is ExtractionInProgress;
 
   bool get _settingsEnabled {
-    final bloc = context.read<ExtractionBloc>();
-    if (bloc.state is ExtractionInProgress) return false;
+    if (_isExtracting) return false;
     if (_outputDirectory == null) return false;
     if (_sourceMode == _SourceMode.local) return _videoPath != null;
     return _ytInfo != null;
@@ -101,6 +89,16 @@ class _HomeScreenState extends State<HomeScreen>
       begin: 0.3,
       end: 1.0,
     ).animate(CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut));
+    _loadPrefs();
+  }
+
+  Future<void> _loadPrefs() async {
+    final lastOut = AppPrefs.lastOutputDir;
+    final recents = AppPrefs.recentVideos;
+    setState(() {
+      if (lastOut != null) _outputDirectory = lastOut;
+      _recentVideos = recents;
+    });
   }
 
   @override
@@ -112,144 +110,300 @@ class _HomeScreenState extends State<HomeScreen>
     super.dispose();
   }
 
+  // Build
   @override
   Widget build(BuildContext context) {
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: SystemUiOverlayStyle.light,
-      child: Scaffold(
-        backgroundColor: _C.bg,
-        body: BlocListener<ExtractionBloc, ExtractionState>(
-          listener: _onStateChange,
-          child: BlocBuilder<ExtractionBloc, ExtractionState>(
-            builder: (context, state) {
-              final extracting = state is ExtractionInProgress;
-              return Column(
-                children: [
-                  _buildTitleBar(),
-                  _buildSourceTabs(disabled: extracting),
-                  Expanded(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
-                      child: Column(
-                        children: [
-                          if (_sourceMode == _SourceMode.local)
-                            _buildLocalSourceCard(disabled: extracting)
-                          else
-                            _buildYouTubeCard(disabled: extracting),
-                          const SizedBox(height: 10),
-                          _buildOutputCard(disabled: extracting),
-                          const SizedBox(height: 10),
-                          _buildSettingsCard(disabled: !_settingsEnabled),
-                          const SizedBox(height: 4),
-                          _buildAdvancedToggle(disabled: !_settingsEnabled),
-                          if (_showAdvanced && _settingsEnabled) ...[
-                            const SizedBox(height: 10),
-                            _buildAdvancedCard(),
-                          ],
-                          const SizedBox(height: 10),
-                          if (extracting) _buildProgressCard(state),
-                          const SizedBox(height: 10),
-                          _buildActionButtons(extracting: extracting),
-                          if (!_canExtract && !extracting) ...[
-                            const SizedBox(height: 8),
-                            _buildHint(),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              );
-            },
+    final theme = AppTheme.of(context);
+    final c = theme.colors;
+    final isGlass = theme.isGlass;
+
+    return KeyboardListener(
+      focusNode: FocusNode()..requestFocus(),
+      autofocus: true,
+      onKeyEvent: _handleKey,
+      child: AnnotatedRegion<SystemUiOverlayStyle>(
+        value: theme.isDark
+            ? SystemUiOverlayStyle.light
+            : SystemUiOverlayStyle.dark,
+        child: Scaffold(
+          backgroundColor: isGlass ? Colors.transparent : c.bg,
+          body: Stack(
+            children: [
+              if (isGlass) _GlassBg(isDark: theme.isDark),
+              BlocListener<ExtractionBloc, ExtractionState>(
+                listener: _onStateChange,
+                child: BlocBuilder<ExtractionBloc, ExtractionState>(
+                  builder: (ctx, state) {
+                    final extracting = state is ExtractionInProgress;
+                    return Column(
+                      children: [
+                        _buildTitleBar(theme),
+                        _buildSourceTabs(theme, disabled: extracting),
+                        Expanded(
+                          child: SingleChildScrollView(
+                            padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
+                            child: Column(
+                              children: [
+                                if (_sourceMode == _SourceMode.local)
+                                  _buildLocalSourceCard(
+                                    theme,
+                                    disabled: extracting,
+                                  )
+                                else
+                                  _buildYouTubeCard(
+                                    theme,
+                                    disabled: extracting,
+                                  ),
+                                const SizedBox(height: 10),
+                                _buildOutputCard(theme, disabled: extracting),
+                                const SizedBox(height: 10),
+                                _buildSettingsCard(
+                                  theme,
+                                  disabled: !_settingsEnabled,
+                                ),
+                                const SizedBox(height: 4),
+                                _buildAdvancedToggle(
+                                  theme,
+                                  disabled: !_settingsEnabled,
+                                ),
+                                if (_showAdvanced && _settingsEnabled) ...[
+                                  const SizedBox(height: 10),
+                                  _buildAdvancedCard(theme),
+                                ],
+                                const SizedBox(height: 10),
+                                if (extracting)
+                                  _buildProgressCard(theme, state),
+                                const SizedBox(height: 10),
+                                _buildActionButtons(
+                                  theme,
+                                  extracting: extracting,
+                                ),
+                                if (!_canExtract && !extracting) ...[
+                                  const SizedBox(height: 8),
+                                  _buildHint(theme),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ),
+            ],
           ),
         ),
       ),
     );
   }
 
+  // Keyboard
+  void _handleKey(KeyEvent event) {
+    if (event is! KeyDownEvent) return;
+    final key = event.logicalKey;
+    if (key == LogicalKeyboardKey.space && !_isExtracting && _canExtract) {
+      _startExtraction();
+      return;
+    }
+    if (key == LogicalKeyboardKey.escape && _isExtracting) {
+      _cancelExtraction();
+      return;
+    }
+    if (key == LogicalKeyboardKey.keyL &&
+        HardwareKeyboard.instance.isControlPressed) {
+      _showLogPanel();
+      return;
+    }
+    if (key == LogicalKeyboardKey.keyS &&
+        HardwareKeyboard.instance.isControlPressed) {
+      _showSettings();
+      return;
+    }
+  }
+
   // Title bar
-  Widget _buildTitleBar() {
-    final isDesktop = !Platform.isAndroid && !Platform.isIOS;
-    return GestureDetector(
-      onPanStart: isDesktop ? (_) => windowManager.startDragging() : null,
-      child: Container(
-        color: _C.surface,
-        padding: EdgeInsets.only(
-          top: isDesktop ? 12 : MediaQuery.of(context).padding.top + 8,
-          left: 16,
-          right: 10,
-          bottom: 10,
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 30,
-              height: 30,
-              decoration: BoxDecoration(
-                color: _C.accentDim,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Icon(
-                Icons.video_library_rounded,
-                color: _C.accent,
-                size: 16,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Frame Extractor',
-                    style: TextStyle(
-                      color: _C.textPri,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: -0.2,
-                    ),
-                  ),
-                  Text(
-                    'Effortless video frame extraction',
-                    style: TextStyle(color: _C.textMuted, fontSize: 10),
-                  ),
-                ],
-              ),
-            ),
-            _TitleBarBtn(
-              icon: Icons.terminal_rounded,
-              tooltip: 'View logs',
-              onTap: _showLogPanel,
-            ),
-            if (isDesktop) ...[
-              const SizedBox(width: 4),
-              _TitleBarBtn(
-                icon: Icons.remove_rounded,
-                tooltip: 'Minimize',
-                onTap: () => windowManager.minimize(),
-              ),
-              const SizedBox(width: 4),
-              _TitleBarBtn(
-                icon: Icons.close_rounded,
-                tooltip: 'Close',
-                onTap: () => windowManager.close(),
-                hoverColor: _C.red,
-              ),
-            ],
-          ],
-        ),
+  Widget _buildTitleBar(AppTheme theme) {
+    final c = theme.colors;
+    final isGlass = theme.isGlass;
+
+    Widget inner = Container(
+      padding: EdgeInsets.only(
+        top: _isDesktop ? 12 : MediaQuery.of(context).padding.top + 8,
+        left: 16,
+        right: 10,
+        bottom: 10,
       ),
+      child: Row(
+        children: [
+          Icon(Icons.video_library_rounded, color: c.accent, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  AppConstants.appName,
+                  style: TextStyle(
+                    color: c.textPri,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+                Text(
+                  AppConstants.appDescription,
+                  style: TextStyle(color: c.textMuted, fontSize: 10),
+                ),
+              ],
+            ),
+          ),
+          _TitleBarBtn(
+            c: c,
+            icon: Icons.terminal_rounded,
+            tooltip: 'View logs (Ctrl+L)',
+            onTap: _showLogPanel,
+            isGlass: isGlass,
+            isDark: theme.isDark,
+          ),
+          const SizedBox(width: 4),
+          _TitleBarBtn(
+            c: c,
+            icon: Icons.tune_rounded,
+            tooltip: 'Settings (Ctrl+S)',
+            onTap: () => _showSettings(),
+            isGlass: isGlass,
+            isDark: theme.isDark,
+          ),
+          if (_isDesktop) ...[
+            const SizedBox(width: 4),
+            _TitleBarBtn(
+              c: c,
+              icon: Icons.remove_rounded,
+              tooltip: 'Minimize',
+              onTap: () => windowManager.minimize(),
+              isGlass: isGlass,
+              isDark: theme.isDark,
+            ),
+            const SizedBox(width: 4),
+            _TitleBarBtn(
+              c: c,
+              icon: Icons.close_rounded,
+              tooltip: 'Close',
+              onTap: () => windowManager.close(),
+              hoverColor: c.red,
+              isGlass: isGlass,
+              isDark: theme.isDark,
+            ),
+          ],
+        ],
+      ),
+    );
+
+    if (isGlass) {
+      inner = ClipRect(
+        child: BackdropFilter(
+          filter: ImageFilter.blur(
+            sigmaX: GlassTokens.blurTitBar,
+            sigmaY: GlassTokens.blurTitBar,
+          ),
+          child: Container(
+            decoration: GlassTokens.fallbackTitleBar(c, isDark: theme.isDark),
+            child: inner,
+          ),
+        ),
+      );
+    } else {
+      inner = Container(color: c.surface, child: inner);
+    }
+
+    return GestureDetector(
+      onPanStart: _isDesktop ? (_) => windowManager.startDragging() : null,
+      child: inner,
     );
   }
 
+  // Settings dialog
+  void _showSettings() {
+    final theme = AppTheme.of(context);
+    if (_isDesktop) {
+      showDialog(
+        context: context,
+        barrierColor: Colors.black.withValues(
+          alpha: theme.isDark ? 0.55 : 0.30,
+        ),
+        builder: (dialogCtx) => _ThemedDialogWrapper(
+          parentContext: context,
+          builder: (liveTheme) => _GlassDialog(
+            theme: liveTheme,
+            child: _SettingsContent(parentContext: context),
+          ),
+        ),
+      );
+    } else {
+      showModalBottomSheet(
+        context: context,
+        backgroundColor: Colors.transparent,
+        isScrollControlled: true,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        builder: (sheetCtx) => _ThemedSheetWrapper(
+          parentContext: context,
+          builder: (liveTheme) => _SettingsContent(parentContext: context),
+        ),
+      );
+    }
+  }
+
+  // Log panel
+  void _showLogPanel() {
+    final bloc = context.read<ExtractionBloc>();
+    final theme = AppTheme.of(context);
+    if (_isDesktop) {
+      showDialog(
+        context: context,
+        barrierColor: Colors.black.withValues(
+          alpha: theme.isDark ? 0.55 : 0.30,
+        ),
+        builder: (dialogCtx) => _ThemedDialogWrapper(
+          parentContext: context,
+          builder: (liveTheme) => _GlassDialog(
+            theme: liveTheme,
+            maxWidth: 620,
+            child: _LogContent(logs: bloc.logs, parentContext: context),
+          ),
+        ),
+      );
+    } else {
+      showModalBottomSheet(
+        context: context,
+        backgroundColor: Colors.transparent,
+        isScrollControlled: true,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        builder: (sheetCtx) => _ThemedSheetWrapper(
+          parentContext: context,
+          builder: (liveTheme) =>
+              _LogContent(logs: bloc.logs, parentContext: context),
+        ),
+      );
+    }
+  }
+
   // Source tabs
-  Widget _buildSourceTabs({required bool disabled}) {
-    return Container(
-      color: _C.surface,
+  Widget _buildSourceTabs(AppTheme theme, {required bool disabled}) {
+    final c = theme.colors;
+    final isGlass = theme.isGlass;
+
+    Widget tabs = Container(
+      color: isGlass ? Colors.transparent : c.surface,
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       child: Row(
         children: [
           _SourceTab(
+            c: c,
             label: 'Local File',
             icon: Icons.folder_rounded,
             selected: _sourceMode == _SourceMode.local,
@@ -259,42 +413,99 @@ class _HomeScreenState extends State<HomeScreen>
                     _sourceMode = _SourceMode.local;
                     _ytInfo = null;
                   }),
+            isGlass: isGlass,
+            isDark: theme.isDark,
           ),
           const SizedBox(width: 8),
           _SourceTab(
+            c: c,
             label: 'YouTube',
             icon: Icons.play_circle_filled_rounded,
             selected: _sourceMode == _SourceMode.youtube,
-            accentColor: _C.ytRed,
+            accentColor: c.ytRed,
             onTap: disabled
                 ? null
                 : () => setState(() => _sourceMode = _SourceMode.youtube),
+            isGlass: isGlass,
+            isDark: theme.isDark,
           ),
         ],
       ),
     );
+
+    if (isGlass) {
+      tabs = ClipRect(
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+          child: Container(
+            decoration: BoxDecoration(
+              color: c.surface.withValues(alpha: theme.isDark ? 0.18 : 0.55),
+              border: Border(
+                bottom: BorderSide(
+                  color: theme.isDark
+                      ? Colors.white.withValues(alpha: 0.08)
+                      : c.border.withValues(alpha: 0.60),
+                ),
+              ),
+            ),
+            child: tabs,
+          ),
+        ),
+      );
+    }
+    return tabs;
+  }
+
+  // Card factory
+  Widget _buildCard(
+    AppTheme theme, {
+    required String label,
+    required Widget child,
+  }) {
+    return theme.isGlass
+        ? _LiquidAppCard(theme: theme, label: label, child: child)
+        : _ClassicAppCard(theme: theme, label: label, child: child);
   }
 
   // Local source card
-  Widget _buildLocalSourceCard({required bool disabled}) {
-    return _Card(
+  Widget _buildLocalSourceCard(AppTheme theme, {required bool disabled}) {
+    final c = theme.colors;
+    return _buildCard(
+      theme,
       label: 'VIDEO SOURCE',
       child: Column(
         children: [
           _FileRow(
+            c: c,
             icon: Icons.movie_rounded,
             label: 'Video File',
             value: _videoPath,
             placeholder: 'Select a video file…',
-            accent: _C.accent,
+            accent: c.accent,
             disabled: disabled,
             onTap: disabled ? null : _pickVideoFile,
+            isGlass: theme.isGlass,
+            isDark: theme.isDark,
           ),
+          if (_recentVideos.isNotEmpty && _videoPath == null && !disabled) ...[
+            _Divider(c: c, isGlass: theme.isGlass, isDark: theme.isDark),
+            _RecentVideosRow(
+              c: c,
+              recents: _recentVideos,
+              onSelect: (path) => setState(() => _videoPath = path),
+              onClear: () async {
+                await AppPrefs.clearRecentVideos();
+                setState(() => _recentVideos = []);
+              },
+            ),
+          ],
           if (_videoPath != null) ...[
-            Divider(color: _C.border, height: 1),
+            _Divider(c: c, isGlass: theme.isGlass, isDark: theme.isDark),
             _ClearRow(
+              c: c,
               disabled: disabled,
               onTap: () => setState(() => _videoPath = null),
+              isGlass: theme.isGlass,
             ),
           ],
         ],
@@ -303,8 +514,10 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   // YouTube card
-  Widget _buildYouTubeCard({required bool disabled}) {
-    return _Card(
+  Widget _buildYouTubeCard(AppTheme theme, {required bool disabled}) {
+    final c = theme.colors;
+    return _buildCard(
+      theme,
       label: 'YOUTUBE SOURCE',
       child: Column(
         children: [
@@ -316,12 +529,12 @@ class _HomeScreenState extends State<HomeScreen>
                   width: 34,
                   height: 34,
                   decoration: BoxDecoration(
-                    color: _C.ytRed.withValues(alpha: 0.12),
+                    color: c.ytRed.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(9),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.play_circle_filled_rounded,
-                    color: _C.ytRed,
+                    color: c.ytRed,
                     size: 17,
                   ),
                 ),
@@ -330,10 +543,10 @@ class _HomeScreenState extends State<HomeScreen>
                   child: TextField(
                     controller: _ytUrlCtrl,
                     enabled: !disabled,
-                    style: const TextStyle(color: _C.textPri, fontSize: 13),
+                    style: TextStyle(color: c.textPri, fontSize: 13),
                     decoration: InputDecoration(
                       hintText: 'https://youtube.com/watch?v=…',
-                      hintStyle: TextStyle(color: _C.textMuted, fontSize: 13),
+                      hintStyle: TextStyle(color: c.textMuted, fontSize: 13),
                       border: InputBorder.none,
                       isDense: true,
                       contentPadding: EdgeInsets.zero,
@@ -343,15 +556,18 @@ class _HomeScreenState extends State<HomeScreen>
                 ),
                 const SizedBox(width: 8),
                 _SmallBtn(
+                  c: c,
                   label: _ytInfoLoading ? '…' : 'Fetch',
                   onTap: (disabled || _ytInfoLoading) ? null : _fetchYtInfo,
-                  color: _C.accent,
+                  color: c.accent,
+                  isGlass: theme.isGlass,
+                  isDark: theme.isDark,
                 ),
               ],
             ),
           ),
           if (_ytInfo != null) ...[
-            Divider(color: _C.border, height: 1),
+            _Divider(c: c, isGlass: theme.isGlass, isDark: theme.isDark),
             Padding(
               padding: const EdgeInsets.all(14),
               child: Row(
@@ -361,14 +577,10 @@ class _HomeScreenState extends State<HomeScreen>
                     width: 34,
                     height: 34,
                     decoration: BoxDecoration(
-                      color: _C.greenDim,
+                      color: c.greenDim,
                       borderRadius: BorderRadius.circular(9),
                     ),
-                    child: const Icon(
-                      Icons.check_rounded,
-                      color: _C.green,
-                      size: 17,
-                    ),
+                    child: Icon(Icons.check_rounded, color: c.green, size: 17),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -379,8 +591,8 @@ class _HomeScreenState extends State<HomeScreen>
                           _ytInfo!.title,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: _C.textPri,
+                          style: TextStyle(
+                            color: c.textPri,
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
                           ),
@@ -388,7 +600,7 @@ class _HomeScreenState extends State<HomeScreen>
                         const SizedBox(height: 2),
                         Text(
                           '${_ytInfo!.uploader}  ·  ${_ytInfo!.durationFormatted}',
-                          style: TextStyle(color: _C.textSec, fontSize: 11),
+                          style: TextStyle(color: c.textSec, fontSize: 11),
                         ),
                       ],
                     ),
@@ -399,17 +611,17 @@ class _HomeScreenState extends State<HomeScreen>
                       onTap: disabled
                           ? null
                           : () => setState(() => _ytInfo = null),
-                      child: const Icon(
+                      child: Icon(
                         Icons.close_rounded,
                         size: 15,
-                        color: _C.textMuted,
+                        color: c.textMuted,
                       ),
                     ),
                   ),
                 ],
               ),
             ),
-            Divider(color: _C.border, height: 1),
+            _Divider(c: c, isGlass: theme.isGlass, isDark: theme.isDark),
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
               child: Column(
@@ -418,7 +630,7 @@ class _HomeScreenState extends State<HomeScreen>
                   Text(
                     'Quality',
                     style: TextStyle(
-                      color: _C.textSec,
+                      color: c.textSec,
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
                     ),
@@ -429,7 +641,8 @@ class _HomeScreenState extends State<HomeScreen>
                     runSpacing: 6,
                     children: YouTubeQuality.values
                         .map(
-                          (q) => _Chip(
+                          (q) => _GlossChip(
+                            c: c,
                             label: q.label,
                             selected: _ytQuality == q,
                             disabled: disabled,
@@ -437,8 +650,10 @@ class _HomeScreenState extends State<HomeScreen>
                                 ? null
                                 : () => setState(() => _ytQuality = q),
                             color: q == YouTubeQuality.audioOnly
-                                ? _C.purple
-                                : _C.accent,
+                                ? c.purple
+                                : c.accent,
+                            isGlass: theme.isGlass,
+                            isDark: theme.isDark,
                           ),
                         )
                         .toList(),
@@ -453,25 +668,32 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   // Output card
-  Widget _buildOutputCard({required bool disabled}) {
-    return _Card(
+  Widget _buildOutputCard(AppTheme theme, {required bool disabled}) {
+    final c = theme.colors;
+    return _buildCard(
+      theme,
       label: 'OUTPUT',
       child: Column(
         children: [
           _FileRow(
+            c: c,
             icon: Icons.folder_rounded,
             label: 'Output Folder',
             value: _outputDirectory,
             placeholder: 'Select output directory…',
-            accent: _C.purple,
+            accent: c.purple,
             disabled: disabled,
             onTap: disabled ? null : _pickOutputDirectory,
+            isGlass: theme.isGlass,
+            isDark: theme.isDark,
           ),
           if (_outputDirectory != null) ...[
-            Divider(color: _C.border, height: 1),
+            _Divider(c: c, isGlass: theme.isGlass, isDark: theme.isDark),
             _ClearRow(
+              c: c,
               disabled: disabled,
               onTap: () => setState(() => _outputDirectory = null),
+              isGlass: theme.isGlass,
             ),
           ],
         ],
@@ -479,12 +701,15 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  // Extraction settings card
-  Widget _buildSettingsCard({required bool disabled}) {
+  // Settings card
+  Widget _buildSettingsCard(AppTheme theme, {required bool disabled}) {
+    final c = theme.colors;
     return _DisabledOverlay(
       disabled: disabled,
       tooltip: _settingsHint,
-      child: _Card(
+      isGlass: theme.isGlass,
+      child: _buildCard(
+        theme,
         label: 'EXTRACTION SETTINGS',
         child: Column(
           children: [
@@ -494,56 +719,64 @@ class _HomeScreenState extends State<HomeScreen>
                 children: [
                   Expanded(
                     child: _TimeField(
+                      c: c,
                       controller: _startTimeCtrl,
                       label: 'Start',
                       icon: Icons.play_circle_outline_rounded,
                       disabled: disabled,
+                      isGlass: theme.isGlass,
+                      isDark: theme.isDark,
                     ),
                   ),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 8),
                     child: Icon(
                       Icons.arrow_forward_rounded,
-                      color: _C.textMuted,
+                      color: c.textMuted,
                       size: 14,
                     ),
                   ),
                   Expanded(
                     child: _TimeField(
+                      c: c,
                       controller: _endTimeCtrl,
                       label: 'End',
                       icon: Icons.stop_circle_outlined,
                       disabled: disabled,
+                      isGlass: theme.isGlass,
+                      isDark: theme.isDark,
                     ),
                   ),
                 ],
               ),
             ),
-            Divider(color: _C.border, height: 1),
+            _Divider(c: c, isGlass: theme.isGlass, isDark: theme.isDark),
             _SliderRow(
+              c: c,
               label: 'FPS',
               value: _fps.toDouble(),
               display: '$_fps fps',
-              min: 1,
-              max: 60,
-              divisions: 59,
-              color: _C.accent,
+              min: AppConstants.minFps.toDouble(),
+              max: AppConstants.maxFps.toDouble(),
+              divisions: 119,
+              color: c.accent,
               disabled: disabled,
               onChanged: (v) => setState(() => _fps = v.toInt()),
             ),
-            Divider(color: _C.border, height: 1),
+            _Divider(c: c, isGlass: theme.isGlass, isDark: theme.isDark),
             _SliderRow(
+              c: c,
               label: 'Quality',
               value: _quality.toDouble(),
               display: '$_quality%',
               min: 1,
               max: 100,
               divisions: 99,
-              color: _C.green,
+              color: c.green,
               disabled: disabled,
               onChanged: (v) => setState(() => _quality = v.toInt()),
             ),
-            Divider(color: _C.border, height: 1),
+            _Divider(c: c, isGlass: theme.isGlass, isDark: theme.isDark),
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
               child: Column(
@@ -552,7 +785,7 @@ class _HomeScreenState extends State<HomeScreen>
                   Text(
                     'Format',
                     style: TextStyle(
-                      color: _C.textSec,
+                      color: c.textSec,
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
                     ),
@@ -561,17 +794,21 @@ class _HomeScreenState extends State<HomeScreen>
                   Wrap(
                     spacing: 6,
                     runSpacing: 6,
-                    children: [
-                      for (final fmt in ['png', 'jpg', 'webp', 'bmp'])
-                        _Chip(
-                          label: fmt.toUpperCase(),
-                          selected: _format == fmt,
-                          disabled: disabled,
-                          onTap: disabled
-                              ? null
-                              : () => setState(() => _format = fmt),
-                        ),
-                    ],
+                    children: AppConstants.supportedFormats
+                        .map(
+                          (fmt) => _GlossChip(
+                            c: c,
+                            label: fmt.toUpperCase(),
+                            selected: _format == fmt,
+                            disabled: disabled,
+                            onTap: disabled
+                                ? null
+                                : () => setState(() => _format = fmt),
+                            isGlass: theme.isGlass,
+                            isDark: theme.isDark,
+                          ),
+                        )
+                        .toList(),
                   ),
                 ],
               ),
@@ -583,22 +820,25 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   // Advanced card
-  Widget _buildAdvancedCard() {
-    return _Card(
+  Widget _buildAdvancedCard(AppTheme theme) {
+    final c = theme.colors;
+    return _buildCard(
+      theme,
       label: 'ADVANCED',
       child: Column(
         children: [
           _SliderRow(
+            c: c,
             label: 'Scale',
             value: _scale,
             display: '${(_scale * 100).toInt()}%',
-            min: 0.1,
-            max: 2.0,
+            min: AppConstants.minScale,
+            max: AppConstants.maxScale,
             divisions: 19,
-            color: _C.orange,
+            color: c.orange,
             onChanged: (v) => setState(() => _scale = v),
           ),
-          Divider(color: _C.border, height: 1),
+          _Divider(c: c, isGlass: theme.isGlass, isDark: theme.isDark),
           Padding(
             padding: const EdgeInsets.all(14),
             child: Column(
@@ -607,21 +847,24 @@ class _HomeScreenState extends State<HomeScreen>
                 Text(
                   'Frame prefix',
                   style: TextStyle(
-                    color: _C.textSec,
+                    color: c.textSec,
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
                 const SizedBox(height: 8),
                 _CompactField(
+                  c: c,
                   initialValue: _framePrefix,
                   hint: 'frame_',
                   onChanged: (v) => _framePrefix = v,
+                  isGlass: theme.isGlass,
+                  isDark: theme.isDark,
                 ),
               ],
             ),
           ),
-          Divider(color: _C.border, height: 1),
+          _Divider(c: c, isGlass: theme.isGlass, isDark: theme.isDark),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             child: Row(
@@ -633,14 +876,14 @@ class _HomeScreenState extends State<HomeScreen>
                       Text(
                         'Open folder when done',
                         style: TextStyle(
-                          color: _C.textSec,
+                          color: c.textSec,
                           fontSize: 12,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
                       Text(
                         'Auto-open output directory after extraction',
-                        style: TextStyle(color: _C.textMuted, fontSize: 10),
+                        style: TextStyle(color: c.textMuted, fontSize: 10),
                       ),
                     ],
                   ),
@@ -649,11 +892,11 @@ class _HomeScreenState extends State<HomeScreen>
                 Switch(
                   value: _openFolderOnDone,
                   onChanged: (v) => setState(() => _openFolderOnDone = v),
-                  activeThumbColor: _C.accent,
+                  activeThumbColor: c.accent,
                   trackColor: WidgetStateProperty.resolveWith(
                     (s) => s.contains(WidgetState.selected)
-                        ? _C.accentDim
-                        : _C.surfaceHi,
+                        ? c.accentDim
+                        : c.surfaceHi,
                   ),
                   thumbColor: WidgetStateProperty.all(Colors.white),
                 ),
@@ -665,9 +908,10 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  Widget _buildAdvancedToggle({required bool disabled}) {
+  Widget _buildAdvancedToggle(AppTheme theme, {required bool disabled}) {
+    final c = theme.colors;
     return Opacity(
-      opacity: disabled ? 0.35 : 1.0,
+      opacity: GlassTokens.disabledOpacity(isGlass: theme.isGlass),
       child: MouseRegion(
         cursor: disabled ? SystemMouseCursors.basic : SystemMouseCursors.click,
         child: GestureDetector(
@@ -683,14 +927,14 @@ class _HomeScreenState extends State<HomeScreen>
                   _showAdvanced
                       ? Icons.keyboard_arrow_up_rounded
                       : Icons.keyboard_arrow_down_rounded,
-                  color: _C.textMuted,
+                  color: c.textMuted,
                   size: 16,
                 ),
                 const SizedBox(width: 4),
                 Text(
                   _showAdvanced ? 'Hide advanced' : 'Advanced options',
-                  style: const TextStyle(
-                    color: _C.textMuted,
+                  style: TextStyle(
+                    color: c.textMuted,
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
                     letterSpacing: 0.3,
@@ -705,13 +949,120 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   // Progress card
-  Widget _buildProgressCard(ExtractionInProgress state) {
+  Widget _buildProgressCard(AppTheme theme, ExtractionInProgress state) {
+    final c = theme.colors;
     final p = state.progress;
     final isDownloading = state.phase == 'downloading';
-    final color = isDownloading ? _C.ytRed : _C.accent;
+    final color = isDownloading ? c.ytRed : c.accent;
     final bgTint = isDownloading
-        ? _C.redDim.withValues(alpha: 0.5)
-        : _C.accentDim.withValues(alpha: 0.5);
+        ? c.redDim.withValues(alpha: 0.5)
+        : c.accentDim.withValues(alpha: 0.5);
+
+    Widget content = Padding(
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              AnimatedBuilder(
+                animation: _pulseAnim,
+                builder: (_, _) => Opacity(
+                  opacity: _pulseAnim.value,
+                  child: Container(
+                    width: 7,
+                    height: 7,
+                    decoration: BoxDecoration(
+                      color: color,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  p.message,
+                  style: TextStyle(
+                    color: c.textPri,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: color.withValues(alpha: 0.35)),
+                ),
+                child: Text(
+                  '${p.percentage}%',
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: p.percentage / 100,
+              minHeight: 3,
+              backgroundColor: c.surfaceHi,
+              valueColor: AlwaysStoppedAnimation(color),
+            ),
+          ),
+          if (p.estimatedFrames > 0) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Icon(Icons.image_outlined, size: 11, color: c.textMuted),
+                const SizedBox(width: 4),
+                Text(
+                  '${p.framesProcessed} / ${p.estimatedFrames} frames',
+                  style: TextStyle(color: c.textSec, fontSize: 11),
+                ),
+                const Spacer(),
+                if (p.timeRemaining != null) ...[
+                  Icon(Icons.timer_outlined, size: 11, color: c.textMuted),
+                  const SizedBox(width: 4),
+                  Text(
+                    'ETA ${_fmtDuration(p.timeRemaining!)}',
+                    style: TextStyle(color: c.textMuted, fontSize: 11),
+                  ),
+                ],
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+
+    Widget card = theme.isGlass
+        ? GlassContainer(
+            useOwnLayer: true,
+            settings: LiquidGlassSettings(
+              thickness: 0.55,
+              blur: 8,
+              glassColor: color.withValues(alpha: 0.15),
+            ),
+            shape: LiquidRoundedRectangle(borderRadius: 16),
+            child: content,
+          )
+        : Container(
+            decoration: BoxDecoration(
+              color: bgTint,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: color.withValues(alpha: 0.25)),
+            ),
+            child: content,
+          );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -720,149 +1071,59 @@ class _HomeScreenState extends State<HomeScreen>
           padding: const EdgeInsets.only(left: 4, bottom: 6),
           child: Text(
             isDownloading ? 'DOWNLOADING' : 'EXTRACTING',
-            style: const TextStyle(
-              color: _C.textMuted,
+            style: TextStyle(
+              color: c.textMuted,
               fontSize: 10,
               fontWeight: FontWeight.w700,
               letterSpacing: 1.2,
             ),
           ),
         ),
-        Container(
-          decoration: BoxDecoration(
-            color: bgTint,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: color.withValues(alpha: 0.25)),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    AnimatedBuilder(
-                      animation: _pulseAnim,
-                      builder: (_, _) => Opacity(
-                        opacity: _pulseAnim.value,
-                        child: Container(
-                          width: 7,
-                          height: 7,
-                          decoration: BoxDecoration(
-                            color: color,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        p.message,
-                        style: const TextStyle(
-                          color: _C.textPri,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: color.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(
-                          color: color.withValues(alpha: 0.35),
-                        ),
-                      ),
-                      child: Text(
-                        '${p.percentage}%',
-                        style: TextStyle(
-                          color: color,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: LinearProgressIndicator(
-                    value: p.percentage / 100,
-                    minHeight: 3,
-                    backgroundColor: _C.surfaceHi,
-                    valueColor: AlwaysStoppedAnimation(color),
-                  ),
-                ),
-                if (p.estimatedFrames > 0) ...[
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Icon(Icons.image_outlined, size: 11, color: _C.textMuted),
-                      const SizedBox(width: 4),
-                      Text(
-                        '${p.framesProcessed} / ${p.estimatedFrames} frames',
-                        style: TextStyle(color: _C.textSec, fontSize: 11),
-                      ),
-                      const Spacer(),
-                      if (p.timeRemaining != null) ...[
-                        Icon(
-                          Icons.timer_outlined,
-                          size: 11,
-                          color: _C.textMuted,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          'ETA ${_fmtDuration(p.timeRemaining!)}',
-                          style: TextStyle(color: _C.textMuted, fontSize: 11),
-                        ),
-                      ],
-                    ],
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ),
+        card,
       ],
     );
   }
 
   // Action buttons
-  Widget _buildActionButtons({required bool extracting}) {
+  Widget _buildActionButtons(AppTheme theme, {required bool extracting}) {
+    final c = theme.colors;
     return Row(
       children: [
         Expanded(
           child: _ActionBtn(
+            c: c,
             label: extracting ? 'Working…' : 'Extract Frames',
             icon: extracting
                 ? Icons.hourglass_top_rounded
                 : Icons.play_arrow_rounded,
-            color: _C.accent,
+            color: c.accent,
+            tooltip: _canExtract && !extracting ? 'Space to start' : null,
             onPressed: (extracting || !_canExtract) ? null : _startExtraction,
+            isGlass: theme.isGlass,
+            isDark: theme.isDark,
           ),
         ),
         if (extracting) ...[
           const SizedBox(width: 10),
           _ActionBtn(
+            c: c,
             label: 'Cancel',
             icon: Icons.stop_rounded,
-            color: _C.red,
+            color: c.red,
+            tooltip: 'Esc to cancel',
             onPressed: _cancelExtraction,
             compact: true,
+            isGlass: theme.isGlass,
+            isDark: theme.isDark,
           ),
         ],
       ],
     );
   }
 
-  // Hint bar
-  Widget _buildHint() {
+  // Hint
+  Widget _buildHint(AppTheme theme) {
+    final c = theme.colors;
     final String msg;
     if (_sourceMode == _SourceMode.local && _videoPath == null) {
       msg = 'Select a video file to continue';
@@ -873,12 +1134,49 @@ class _HomeScreenState extends State<HomeScreen>
     } else {
       return const SizedBox.shrink();
     }
+
+    if (theme.isGlass) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: c.accent.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: c.accent.withValues(alpha: 0.30)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.info_outline_rounded,
+                  size: 13,
+                  color: c.accent.withValues(alpha: 0.8),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  msg,
+                  style: TextStyle(
+                    color: c.accent.withValues(alpha: 0.9),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: _C.accentDim,
+        color: c.accentDim,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: _C.accent.withValues(alpha: 0.25)),
+        border: Border.all(color: c.accent.withValues(alpha: 0.25)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -886,13 +1184,13 @@ class _HomeScreenState extends State<HomeScreen>
           Icon(
             Icons.info_outline_rounded,
             size: 13,
-            color: _C.accent.withValues(alpha: 0.8),
+            color: c.accent.withValues(alpha: 0.8),
           ),
           const SizedBox(width: 6),
           Text(
             msg,
             style: TextStyle(
-              color: _C.accent.withValues(alpha: 0.8),
+              color: c.accent.withValues(alpha: 0.8),
               fontSize: 12,
               fontWeight: FontWeight.w500,
             ),
@@ -902,32 +1200,21 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  void _showLogPanel() {
-    final bloc = context.read<ExtractionBloc>();
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: _C.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      isScrollControlled: true,
-      builder: (_) => _LogPanel(logs: bloc.logs),
-    );
-  }
-
+  // State change handler
   void _onStateChange(BuildContext context, ExtractionState state) {
+    final c = AppTheme.of(context).colors;
     if (state is ExtractionSuccess) {
-      _toast(state.message, _C.green, _C.greenDim, Icons.check_circle_rounded);
+      _toast(state.message, c.green, c.greenDim, Icons.check_circle_rounded);
       if (_openFolderOnDone && state.outputDirectory.isNotEmpty) {
         _openFolder(state.outputDirectory);
       }
     } else if (state is ExtractionFailure) {
-      _toast(state.error, _C.red, _C.redDim, Icons.error_rounded);
+      _toast(state.error, c.red, c.redDim, Icons.error_rounded);
     } else if (state is ExtractionCancelled) {
       _toast(
         'Extraction cancelled',
-        _C.orange,
-        _C.orange.withValues(alpha: 0.15),
+        c.orange,
+        c.orange.withValues(alpha: 0.15),
         Icons.cancel_rounded,
       );
     }
@@ -967,13 +1254,21 @@ class _HomeScreenState extends State<HomeScreen>
   Future<void> _pickVideoFile() async {
     final r = await FilePicker.platform.pickFiles(type: FileType.video);
     if (r?.files.single.path != null) {
-      setState(() => _videoPath = r!.files.single.path);
+      final path = r!.files.single.path!;
+      await AppPrefs.addRecentVideo(path);
+      setState(() {
+        _videoPath = path;
+        _recentVideos = AppPrefs.recentVideos;
+      });
     }
   }
 
   Future<void> _pickOutputDirectory() async {
     final r = await FilePicker.platform.getDirectoryPath();
-    if (r != null) setState(() => _outputDirectory = r);
+    if (r != null) {
+      await AppPrefs.setLastOutputDir(r);
+      setState(() => _outputDirectory = r);
+    }
   }
 
   Future<void> _fetchYtInfo() async {
@@ -984,6 +1279,7 @@ class _HomeScreenState extends State<HomeScreen>
       _ytInfo = null;
     });
     final svc = YouTubeService();
+    final c = AppTheme.of(context).colors;
     final info = await svc.getVideoInfo(url);
     setState(() {
       _ytInfo = info;
@@ -992,8 +1288,8 @@ class _HomeScreenState extends State<HomeScreen>
     if (info == null) {
       _toast(
         'Could not fetch video info. Check the URL or yt-dlp.',
-        _C.red,
-        _C.redDim,
+        c.red,
+        c.redDim,
         Icons.error_rounded,
       );
     }
@@ -1038,78 +1334,981 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   String _fmtDuration(Duration d) {
-    if (d.inMinutes > 0) return '${d.inMinutes}m ${d.inSeconds % 60}s';
+    if (d.inMinutes > 0) {
+      return '${d.inMinutes}m ${d.inSeconds % 60}s';
+    }
     return '${d.inSeconds}s';
   }
 }
 
-// Disabled overlay
+// ThemedDialogWrapper
+class _ThemedDialogWrapper extends StatelessWidget {
+  final BuildContext parentContext;
+  final Widget Function(AppTheme) builder;
+  const _ThemedDialogWrapper({
+    required this.parentContext,
+    required this.builder,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: _AppThemeNotifier.of(parentContext),
+      builder: (_, _) {
+        final liveTheme = AppTheme.of(parentContext);
+        return builder(liveTheme);
+      },
+    );
+  }
+}
+
+// ThemedSheetWrapper
+class _ThemedSheetWrapper extends StatelessWidget {
+  final BuildContext parentContext;
+  final Widget Function(AppTheme) builder;
+  const _ThemedSheetWrapper({
+    required this.parentContext,
+    required this.builder,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: _AppThemeNotifier.of(parentContext),
+      builder: (_, _) {
+        final liveTheme = AppTheme.of(parentContext);
+        return _GlassSheet(theme: liveTheme, child: builder(liveTheme));
+      },
+    );
+  }
+}
+
+// AppThemeNotifier
+class _AppThemeNotifier extends ChangeNotifier {
+  static _AppThemeNotifier? _instance;
+  static _AppThemeNotifier of(BuildContext context) =>
+      _instance ??= _AppThemeNotifier._();
+  _AppThemeNotifier._();
+  void notify() => notifyListeners();
+}
+
+class _LiveThemeChild extends StatefulWidget {
+  final BuildContext parentContext;
+  final Widget Function(AppTheme) builder;
+  const _LiveThemeChild({required this.parentContext, required this.builder});
+  @override
+  State<_LiveThemeChild> createState() => _LiveThemeChildState();
+}
+
+class _LiveThemeChildState extends State<_LiveThemeChild> {
+  late AppTheme _theme;
+  @override
+  void initState() {
+    super.initState();
+    _theme = AppTheme.of(widget.parentContext);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _update());
+  }
+
+  void _update() {
+    if (!mounted) return;
+    final newTheme = AppTheme.of(widget.parentContext);
+    if (newTheme.isDark != _theme.isDark || newTheme.style != _theme.style) {
+      setState(() => _theme = newTheme);
+    }
+    Future.delayed(const Duration(milliseconds: 100), _update);
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.builder(_theme);
+}
+
+// GlassBg
+class _GlassBg extends StatelessWidget {
+  final bool isDark;
+  const _GlassBg({required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF07090D) : const Color(0xFFECEEF6),
+        gradient: isDark
+            ? const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color(0xFF0A0C12),
+                  Color(0xFF080A0F),
+                  Color(0xFF0C0E14),
+                ],
+                stops: [0.0, 0.5, 1.0],
+              )
+            : const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color(0xFFEDF0FA),
+                  Color(0xFFEAECF5),
+                  Color(0xFFEFF1FA),
+                ],
+                stops: [0.0, 0.5, 1.0],
+              ),
+      ),
+    );
+  }
+}
+
+// GlassDialog
+class _GlassDialog extends StatelessWidget {
+  final AppTheme theme;
+  final Widget child;
+  final double maxWidth;
+  const _GlassDialog({
+    required this.theme,
+    required this.child,
+    this.maxWidth = 480,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = theme.colors;
+    final isGlass = theme.isGlass;
+
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      insetPadding: const EdgeInsets.all(24),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxWidth),
+        child: isGlass
+            ? GlassContainer(
+                useOwnLayer: true,
+                settings: GlassTokens.modalSettings(isDark: theme.isDark),
+                shape: LiquidRoundedRectangle(borderRadius: 28),
+                child: child,
+              )
+            : Container(
+                decoration: BoxDecoration(
+                  color: c.surface,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: c.border),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(
+                        alpha: theme.isDark ? 0.55 : 0.18,
+                      ),
+                      blurRadius: 40,
+                      offset: const Offset(0, 16),
+                    ),
+                  ],
+                ),
+                child: child,
+              ),
+      ),
+    );
+  }
+}
+
+// GlassSheet
+class _GlassSheet extends StatelessWidget {
+  final AppTheme theme;
+  final Widget child;
+  const _GlassSheet({required this.theme, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = theme.colors;
+    if (theme.isGlass) {
+      return ClipRRect(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(
+            sigmaX: GlassTokens.blurModal,
+            sigmaY: GlassTokens.blurModal,
+          ),
+          child: Container(
+            decoration: BoxDecoration(
+              color: c.surface.withValues(alpha: theme.isDark ? 0.26 : 0.72),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(28),
+              ),
+              border: Border(
+                top: BorderSide(
+                  // FIX: real border token on light glass
+                  color: theme.isDark
+                      ? Colors.white.withValues(alpha: 0.18)
+                      : c.borderHi.withValues(alpha: 0.70),
+                ),
+              ),
+            ),
+            child: child,
+          ),
+        ),
+      );
+    }
+    return Container(
+      decoration: BoxDecoration(
+        color: c.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: child,
+    );
+  }
+}
+
+// LiquidAppCard
+class _LiquidAppCard extends StatelessWidget {
+  final AppTheme theme;
+  final String label;
+  final Widget child;
+  const _LiquidAppCard({
+    required this.theme,
+    required this.label,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = theme.colors;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 6),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: GlassTokens.cardLabelColor(c, isDark: theme.isDark),
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.4,
+            ),
+          ),
+        ),
+        GlassContainer(
+          useOwnLayer: true,
+          settings: GlassTokens.cardSettings(isDark: theme.isDark),
+          shape: LiquidRoundedRectangle(borderRadius: 18),
+          child: child,
+        ),
+      ],
+    );
+  }
+}
+
+// ClassicAppCard
+class _ClassicAppCard extends StatelessWidget {
+  final AppTheme theme;
+  final String label;
+  final Widget child;
+  const _ClassicAppCard({
+    required this.theme,
+    required this.label,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = theme.colors;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 6),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: c.textMuted,
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.2,
+            ),
+          ),
+        ),
+        Container(
+          decoration: theme.classicCard(),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(14),
+            child: child,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// SettingsContent
+class _SettingsContent extends StatelessWidget {
+  final BuildContext parentContext;
+  const _SettingsContent({required this.parentContext});
+
+  @override
+  Widget build(BuildContext context) => _LiveThemeChild(
+    parentContext: parentContext,
+    builder: (liveTheme) =>
+        _SettingsBody(theme: liveTheme, parentContext: parentContext),
+  );
+}
+
+class _SettingsBody extends StatelessWidget {
+  final AppTheme theme;
+  final BuildContext parentContext;
+  const _SettingsBody({required this.theme, required this.parentContext});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = theme.colors;
+    final provider = AppThemeProvider.of(parentContext);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: theme.isGlass
+                    ? (theme.isDark
+                          ? Colors.white.withValues(alpha: 0.20)
+                          : c.borderHi)
+                    : c.border,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Text(
+                'Settings',
+                style: TextStyle(
+                  color: c.textPri,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const Spacer(),
+              if (_isDesktop)
+                _CloseBtn(c: c, isGlass: theme.isGlass, isDark: theme.isDark),
+            ],
+          ),
+          const SizedBox(height: 20),
+          _SectionLabel(c: c, label: 'APPEARANCE'),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: _SettingsTile(
+                  c: c,
+                  icon: Icons.dark_mode_rounded,
+                  label: 'Dark',
+                  selected: theme.isDark,
+                  isGlass: theme.isGlass,
+                  isDark: theme.isDark,
+                  onTap: () async {
+                    provider.setDark(true);
+                    await AppPrefs.setThemeMode('dark');
+                  },
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _SettingsTile(
+                  c: c,
+                  icon: Icons.light_mode_rounded,
+                  label: 'Light',
+                  selected: !theme.isDark,
+                  isGlass: theme.isGlass,
+                  isDark: theme.isDark,
+                  onTap: () async {
+                    provider.setDark(false);
+                    await AppPrefs.setThemeMode('light');
+                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _SectionLabel(c: c, label: 'UI STYLE'),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: _SettingsTile(
+                  c: c,
+                  icon: Icons.layers_rounded,
+                  label: 'Classic',
+                  subtitle: 'Clean & sharp',
+                  selected: theme.style == UIStyle.classic,
+                  isGlass: theme.isGlass,
+                  isDark: theme.isDark,
+                  onTap: () async {
+                    provider.setStyle(UIStyle.classic);
+                    await AppPrefs.setUIStyle('classic');
+                  },
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _SettingsTile(
+                  c: c,
+                  icon: Icons.blur_on_rounded,
+                  label: 'Liquid Glass',
+                  subtitle: 'Experimental',
+                  selected: theme.style == UIStyle.glass,
+                  isGlass: theme.isGlass,
+                  isDark: theme.isDark,
+                  onTap: () async {
+                    if (theme.style != UIStyle.glass) {
+                      _showExperimentalWarning(
+                        context,
+                        parentContext: parentContext,
+                        onConfirm: () async {
+                          provider.setStyle(UIStyle.glass);
+                          await AppPrefs.setUIStyle('glass');
+                        },
+                        theme: theme,
+                      );
+                    } else {
+                      provider.setStyle(UIStyle.classic);
+                      await AppPrefs.setUIStyle('classic');
+                    }
+                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          _SectionLabel(c: c, label: 'KEYBOARD SHORTCUTS'),
+          const SizedBox(height: 10),
+          _ShortcutRow(c: c, key_: 'Space', label: 'Start extraction'),
+          _ShortcutRow(c: c, key_: 'Esc', label: 'Cancel extraction'),
+          _ShortcutRow(c: c, key_: 'Ctrl+L', label: 'Open log panel'),
+          _ShortcutRow(c: c, key_: 'Ctrl+S', label: 'Open settings panel'),
+        ],
+      ),
+    );
+  }
+
+  void _showExperimentalWarning(
+    BuildContext context, {
+    required BuildContext parentContext,
+    required VoidCallback onConfirm,
+    required AppTheme theme,
+  }) {
+    final c = theme.colors;
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: theme.isDark ? 0.60 : 0.35),
+      builder: (_) => Dialog(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 32, vertical: 80),
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 380),
+          padding: const EdgeInsets.all(24),
+          decoration: theme.isGlass
+              ? BoxDecoration(
+                  color: c.surface.withValues(
+                    alpha: theme.isDark ? 0.30 : 0.82,
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: theme.isDark
+                        ? Colors.white.withValues(alpha: 0.20)
+                        : c.borderHi.withValues(alpha: 0.80),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(
+                        alpha: theme.isDark ? 0.50 : 0.15,
+                      ),
+                      blurRadius: 48,
+                      offset: const Offset(0, 16),
+                    ),
+                  ],
+                )
+              : BoxDecoration(
+                  color: c.surface,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: c.border),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(
+                        alpha: theme.isDark ? 0.50 : 0.15,
+                      ),
+                      blurRadius: 32,
+                      offset: const Offset(0, 12),
+                    ),
+                  ],
+                ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: c.orange.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      Icons.warning_amber_rounded,
+                      color: c.orange,
+                      size: 18,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Experimental Feature',
+                      style: TextStyle(
+                        color: c.textPri,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Liquid Glass style is still in early development, and not all platform may support this features.',
+                style: TextStyle(color: c.textSec, fontSize: 13, height: 1.5),
+              ),
+              const SizedBox(height: 8),
+              _WarningBullet(
+                c: c,
+                text: 'May cause performance issues on low-end devices',
+              ),
+              _WarningBullet(
+                c: c,
+                text: 'Memory spikes possible when animating shapes',
+              ),
+              _WarningBullet(
+                c: c,
+                text: 'Using experimental features at your own risk!',
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(
+                    child: MouseRegion(
+                      cursor: SystemMouseCursors.click,
+                      child: GestureDetector(
+                        onTap: () => Navigator.of(context).pop(),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 11),
+                          decoration: BoxDecoration(
+                            color: c.surfaceHi,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: c.border),
+                          ),
+                          child: Center(
+                            child: Text(
+                              'Cancel',
+                              style: TextStyle(
+                                color: c.textSec,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: MouseRegion(
+                      cursor: SystemMouseCursors.click,
+                      child: GestureDetector(
+                        onTap: () {
+                          Navigator.of(context).pop();
+                          onConfirm();
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 11),
+                          decoration: BoxDecoration(
+                            color: c.orange.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: c.orange.withValues(alpha: 0.50),
+                            ),
+                          ),
+                          child: Center(
+                            child: Text(
+                              'Enable Anyway',
+                              style: TextStyle(
+                                color: c.orange,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _WarningBullet extends StatelessWidget {
+  final AppColors c;
+  final String text;
+  const _WarningBullet({required this.c, required this.text});
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(top: 5),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(top: 5),
+          child: Container(
+            width: 4,
+            height: 4,
+            decoration: BoxDecoration(
+              color: c.orange.withValues(alpha: 0.70),
+              shape: BoxShape.circle,
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            text,
+            style: TextStyle(color: c.textSec, fontSize: 12, height: 1.4),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+// LogContent
+class _LogContent extends StatelessWidget {
+  final List<String> logs;
+  final BuildContext parentContext;
+  const _LogContent({required this.logs, required this.parentContext});
+
+  @override
+  Widget build(BuildContext context) => _LiveThemeChild(
+    parentContext: parentContext,
+    builder: (liveTheme) => _LogBody(logs: logs, theme: liveTheme),
+  );
+}
+
+class _LogBody extends StatelessWidget {
+  final List<String> logs;
+  final AppTheme theme;
+  const _LogBody({required this.logs, required this.theme});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = theme.colors;
+    return SizedBox(
+      height: _isDesktop ? 480 : null,
+      child: DraggableScrollableSheet(
+        expand: true,
+        initialChildSize: _isDesktop ? 1.0 : 0.55,
+        maxChildSize: 1.0,
+        minChildSize: _isDesktop ? 1.0 : 0.3,
+        builder: (_, ctrl) => Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: theme.isGlass
+                      ? (theme.isDark
+                            ? Colors.white.withValues(alpha: 0.20)
+                            : c.borderHi)
+                      : c.border,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              child: Row(
+                children: [
+                  Icon(Icons.terminal_rounded, color: c.accent, size: 16),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Process Log',
+                    style: TextStyle(
+                      color: c.textPri,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: theme.isGlass
+                          ? (theme.isDark
+                                ? Colors.white.withValues(alpha: 0.08)
+                                : c.surfaceHi)
+                          : c.surfaceHi,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      '${logs.length} lines',
+                      style: TextStyle(
+                        color: c.textSec,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  if (_isDesktop) ...[
+                    const SizedBox(width: 8),
+                    _CloseBtn(
+                      c: c,
+                      isGlass: theme.isGlass,
+                      isDark: theme.isDark,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            Container(
+              height: 1,
+              color: theme.isGlass
+                  ? (theme.isDark
+                        ? Colors.white.withValues(alpha: 0.08)
+                        : c.border)
+                  : c.border,
+            ),
+            Expanded(
+              child: logs.isEmpty
+                  ? Center(
+                      child: Text(
+                        'No logs yet.',
+                        style: TextStyle(color: c.textMuted, fontSize: 13),
+                      ),
+                    )
+                  : ListView.builder(
+                      controller: ctrl,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                      itemCount: logs.length,
+                      itemBuilder: (_, i) {
+                        final line = logs[i];
+                        final isErr = line.startsWith('[ERR]');
+                        final isWarn = line.startsWith('[WARN]');
+                        final isInfo =
+                            line.startsWith('[INFO]') ||
+                            line.startsWith('[Android]') ||
+                            line.startsWith('[Copy]');
+                        final color = isErr
+                            ? c.red
+                            : isWarn
+                            ? c.orange
+                            : isInfo
+                            ? c.accent
+                            : c.textSec;
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 3),
+                          child: Text(
+                            line,
+                            style: TextStyle(
+                              color: color,
+                              fontSize: 11,
+                              fontFamily: 'monospace',
+                              height: 1.5,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: GestureDetector(
+                  onTap: () {
+                    Clipboard.setData(ClipboardData(text: logs.join('\n')));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Logs copied to clipboard'),
+                        duration: Duration(seconds: 2),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  },
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    decoration: BoxDecoration(
+                      color: theme.isGlass
+                          ? (theme.isDark
+                                ? Colors.white.withValues(alpha: 0.08)
+                                : c.surfaceHi)
+                          : c.surfaceHi,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: theme.isGlass
+                            ? (theme.isDark
+                                  ? Colors.white.withValues(alpha: 0.15)
+                                  : c.borderHi)
+                            : c.border,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.copy_rounded, color: c.textSec, size: 14),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Copy all logs',
+                          style: TextStyle(
+                            color: c.textSec,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// Small close button
+class _CloseBtn extends StatelessWidget {
+  final AppColors c;
+  final bool isGlass, isDark;
+  const _CloseBtn({
+    required this.c,
+    required this.isGlass,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) => MouseRegion(
+    cursor: SystemMouseCursors.click,
+    child: GestureDetector(
+      onTap: () => Navigator.of(context).pop(),
+      child: Container(
+        width: 28,
+        height: 28,
+        decoration: BoxDecoration(
+          color: isGlass
+              ? (isDark ? Colors.white.withValues(alpha: 0.08) : c.surfaceHi)
+              : c.surfaceHi,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isGlass
+                ? (isDark ? Colors.white.withValues(alpha: 0.15) : c.borderHi)
+                : c.border,
+          ),
+        ),
+        child: Icon(Icons.close_rounded, size: 14, color: c.textSec),
+      ),
+    ),
+  );
+}
+
+// Divider
+class _Divider extends StatelessWidget {
+  final AppColors c;
+  final bool isGlass, isDark;
+  const _Divider({
+    required this.c,
+    required this.isGlass,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) => Container(
+    height: 1,
+    color: isGlass
+        ? (isDark
+              ? Colors.white.withValues(alpha: 0.07)
+              : c.border.withValues(alpha: 0.50))
+        : c.border,
+  );
+}
+
+// DisabledOverlay
 class _DisabledOverlay extends StatelessWidget {
   final bool disabled;
+  final bool isGlass;
   final String tooltip;
   final Widget child;
   const _DisabledOverlay({
     required this.disabled,
     required this.tooltip,
+    required this.isGlass,
     required this.child,
   });
+
   @override
   Widget build(BuildContext context) {
     if (!disabled) return child;
     return Tooltip(
       message: tooltip,
-      child: IgnorePointer(child: Opacity(opacity: 0.38, child: child)),
+      child: IgnorePointer(
+        child: Opacity(
+          opacity: GlassTokens.disabledOpacity(isGlass: isGlass),
+          child: child,
+        ),
+      ),
     );
   }
 }
 
-// Card container
-class _Card extends StatelessWidget {
-  final String label;
-  final Widget child;
-  const _Card({required this.label, required this.child});
-  @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Padding(
-        padding: const EdgeInsets.only(left: 4, bottom: 6),
-        child: Text(
-          label,
-          style: const TextStyle(
-            color: _C.textMuted,
-            fontSize: 10,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 1.2,
-          ),
-        ),
-      ),
-      Container(
-        decoration: BoxDecoration(
-          color: _C.surface,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: _C.border),
-        ),
-        child: ClipRRect(borderRadius: BorderRadius.circular(14), child: child),
-      ),
-    ],
-  );
-}
-
-// Clear button
+// ClearRow
 class _ClearRow extends StatelessWidget {
+  final AppColors c;
   final bool disabled;
   final VoidCallback onTap;
-  const _ClearRow({required this.disabled, required this.onTap});
+  final bool isGlass;
+  const _ClearRow({
+    required this.c,
+    required this.disabled,
+    required this.onTap,
+    required this.isGlass,
+  });
+
   @override
   Widget build(BuildContext context) => MouseRegion(
     cursor: disabled ? SystemMouseCursors.basic : SystemMouseCursors.click,
     child: InkWell(
       onTap: disabled ? null : onTap,
-      mouseCursor: disabled
-          ? SystemMouseCursors.basic
-          : SystemMouseCursors.click,
-      borderRadius: const BorderRadius.vertical(bottom: Radius.circular(14)),
+      borderRadius: const BorderRadius.vertical(bottom: Radius.circular(18)),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         child: Row(
@@ -1118,13 +2317,13 @@ class _ClearRow extends StatelessWidget {
             Icon(
               Icons.delete_outline_rounded,
               size: 14,
-              color: disabled ? _C.textMuted : _C.red.withValues(alpha: 0.7),
+              color: disabled ? c.textMuted : c.red.withValues(alpha: 0.7),
             ),
             const SizedBox(width: 6),
             Text(
               'Clear',
               style: TextStyle(
-                color: disabled ? _C.textMuted : _C.red.withValues(alpha: 0.7),
+                color: disabled ? c.textMuted : c.red.withValues(alpha: 0.7),
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
               ),
@@ -1136,17 +2335,22 @@ class _ClearRow extends StatelessWidget {
   );
 }
 
-// Title bar button
+// TitleBarBtn
 class _TitleBarBtn extends StatefulWidget {
+  final AppColors c;
   final IconData icon;
   final String tooltip;
   final VoidCallback onTap;
-  final Color hoverColor;
+  final Color? hoverColor;
+  final bool isGlass, isDark;
   const _TitleBarBtn({
+    required this.c,
     required this.icon,
     required this.tooltip,
     required this.onTap,
-    this.hoverColor = _C.borderHi,
+    required this.isGlass,
+    required this.isDark,
+    this.hoverColor,
   });
   @override
   State<_TitleBarBtn> createState() => _TitleBarBtnState();
@@ -1154,6 +2358,7 @@ class _TitleBarBtn extends StatefulWidget {
 
 class _TitleBarBtnState extends State<_TitleBarBtn> {
   bool _hov = false;
+
   @override
   Widget build(BuildContext context) => Tooltip(
     message: widget.tooltip,
@@ -1168,12 +2373,19 @@ class _TitleBarBtnState extends State<_TitleBarBtn> {
           width: 30,
           height: 30,
           decoration: BoxDecoration(
-            color: _hov ? widget.hoverColor : Colors.transparent,
-            borderRadius: BorderRadius.circular(7),
+            color: _hov
+                ? (widget.hoverColor ??
+                      (widget.isGlass
+                          ? Colors.white.withValues(
+                              alpha: widget.isDark ? 0.18 : 0.40,
+                            )
+                          : widget.c.borderHi))
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
           ),
           child: Icon(
             widget.icon,
-            color: _hov ? Colors.white : _C.textSec,
+            color: _hov ? Colors.white : widget.c.textSec,
             size: 16,
           ),
         ),
@@ -1182,23 +2394,88 @@ class _TitleBarBtnState extends State<_TitleBarBtn> {
   );
 }
 
-// Source tab
+// SourceTab
 class _SourceTab extends StatelessWidget {
+  final AppColors c;
   final String label;
   final IconData icon;
   final bool selected;
   final VoidCallback? onTap;
-  final Color accentColor;
+  final Color? accentColor;
+  final bool isGlass, isDark;
   const _SourceTab({
+    required this.c,
     required this.label,
     required this.icon,
     required this.selected,
     required this.onTap,
-    this.accentColor = _C.accent,
+    required this.isGlass,
+    required this.isDark,
+    this.accentColor,
   });
+
   @override
   Widget build(BuildContext context) {
-    final eff = onTap != null ? accentColor : _C.textMuted;
+    final eff = onTap != null ? (accentColor ?? c.accent) : c.textMuted;
+
+    if (isGlass) {
+      return MouseRegion(
+        cursor: onTap != null
+            ? SystemMouseCursors.click
+            : SystemMouseCursors.basic,
+        child: GestureDetector(
+          onTap: onTap,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+            decoration: BoxDecoration(
+              color: selected
+                  ? eff.withValues(alpha: 0.18)
+                  : (isDark
+                        ? Colors.white.withValues(alpha: 0.05)
+                        : c.surface.withValues(alpha: 0.55)),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: selected
+                    ? eff.withValues(alpha: 0.50)
+                    : (isDark
+                          ? Colors.white.withValues(alpha: 0.12)
+                          : c.borderHi.withValues(alpha: 0.60)),
+                width: selected ? 1.5 : 1.0,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  icon,
+                  color: selected
+                      ? eff
+                      : (isDark
+                            ? Colors.white.withValues(alpha: 0.40)
+                            : c.textSec),
+                  size: 14,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: selected
+                        ? eff
+                        : (isDark
+                              ? Colors.white.withValues(alpha: 0.50)
+                              : c.textSec),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     return MouseRegion(
       cursor: onTap != null
           ? SystemMouseCursors.click
@@ -1212,18 +2489,18 @@ class _SourceTab extends StatelessWidget {
             color: selected ? eff.withValues(alpha: 0.15) : Colors.transparent,
             borderRadius: BorderRadius.circular(9),
             border: Border.all(
-              color: selected ? eff.withValues(alpha: 0.5) : _C.border,
+              color: selected ? eff.withValues(alpha: 0.5) : c.border,
             ),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, color: selected ? eff : _C.textMuted, size: 14),
+              Icon(icon, color: selected ? eff : c.textMuted, size: 14),
               const SizedBox(width: 6),
               Text(
                 label,
                 style: TextStyle(
-                  color: selected ? eff : _C.textMuted,
+                  color: selected ? eff : c.textMuted,
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
                 ),
@@ -1236,21 +2513,24 @@ class _SourceTab extends StatelessWidget {
   }
 }
 
-// File row
+// FileRow
 class _FileRow extends StatefulWidget {
+  final AppColors c;
   final IconData icon;
-  final String label;
+  final String label, placeholder;
   final String? value;
-  final String placeholder;
   final Color accent;
-  final bool disabled;
+  final bool disabled, isGlass, isDark;
   final VoidCallback? onTap;
   const _FileRow({
+    required this.c,
     required this.icon,
     required this.label,
     required this.value,
     required this.placeholder,
     required this.accent,
+    required this.isGlass,
+    required this.isDark,
     this.disabled = false,
     this.onTap,
   });
@@ -1267,7 +2547,7 @@ class _FileRowState extends State<_FileRow> {
     final name = hasValue
         ? widget.value!.split('/').last.split('\\').last
         : widget.placeholder;
-    final eff = widget.disabled ? _C.textMuted : widget.accent;
+    final eff = widget.disabled ? widget.c.textMuted : widget.accent;
 
     return MouseRegion(
       cursor: widget.disabled
@@ -1277,21 +2557,18 @@ class _FileRowState extends State<_FileRow> {
       onExit: (_) => setState(() => _hov = false),
       child: InkWell(
         onTap: widget.onTap,
-        mouseCursor: widget.disabled
-            ? SystemMouseCursors.basic
-            : SystemMouseCursors.click,
-        borderRadius: hasValue
-            ? const BorderRadius.vertical(top: Radius.circular(14))
-            : BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(18),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 120),
           decoration: BoxDecoration(
             color: (!widget.disabled && _hov)
-                ? _C.borderHi.withValues(alpha: 0.5)
+                ? (widget.isGlass
+                      ? Colors.white.withValues(
+                          alpha: widget.isDark ? 0.06 : 0.18,
+                        )
+                      : widget.c.borderHi.withValues(alpha: 0.5))
                 : Colors.transparent,
-            borderRadius: hasValue
-                ? const BorderRadius.vertical(top: Radius.circular(14))
-                : BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(18),
           ),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
@@ -1301,7 +2578,7 @@ class _FileRowState extends State<_FileRow> {
                   width: 34,
                   height: 34,
                   decoration: BoxDecoration(
-                    color: eff.withValues(alpha: widget.disabled ? 0.05 : 0.12),
+                    color: eff.withValues(alpha: widget.disabled ? 0.05 : 0.14),
                     borderRadius: BorderRadius.circular(9),
                   ),
                   child: Icon(widget.icon, color: eff, size: 17),
@@ -1314,7 +2591,11 @@ class _FileRowState extends State<_FileRow> {
                       Text(
                         widget.label,
                         style: TextStyle(
-                          color: _C.textSec,
+                          color: widget.isGlass
+                              ? (widget.isDark
+                                    ? Colors.white.withValues(alpha: 0.38)
+                                    : widget.c.textSec)
+                              : widget.c.textSec,
                           fontSize: 10,
                           fontWeight: FontWeight.w600,
                           letterSpacing: 0.4,
@@ -1326,7 +2607,17 @@ class _FileRowState extends State<_FileRow> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: hasValue ? _C.textPri : _C.textMuted,
+                          color: hasValue
+                              ? (widget.isGlass
+                                    ? (widget.isDark
+                                          ? Colors.white.withValues(alpha: 0.88)
+                                          : widget.c.textPri)
+                                    : widget.c.textPri)
+                              : (widget.isGlass
+                                    ? (widget.isDark
+                                          ? Colors.white.withValues(alpha: 0.28)
+                                          : widget.c.textMuted)
+                                    : widget.c.textMuted),
                           fontSize: 13,
                           fontWeight: hasValue
                               ? FontWeight.w500
@@ -1341,7 +2632,13 @@ class _FileRowState extends State<_FileRow> {
                   hasValue
                       ? Icons.check_circle_rounded
                       : Icons.add_circle_outline_rounded,
-                  color: hasValue ? eff : _C.textMuted,
+                  color: hasValue
+                      ? eff
+                      : (widget.isGlass
+                            ? (widget.isDark
+                                  ? Colors.white.withValues(alpha: 0.20)
+                                  : widget.c.textMuted)
+                            : widget.c.textMuted),
                   size: 18,
                 ),
               ],
@@ -1353,8 +2650,9 @@ class _FileRowState extends State<_FileRow> {
   }
 }
 
-// Slider row
+// SliderRow
 class _SliderRow extends StatelessWidget {
+  final AppColors c;
   final String label, display;
   final double value, min, max;
   final int divisions;
@@ -1362,6 +2660,7 @@ class _SliderRow extends StatelessWidget {
   final bool disabled;
   final ValueChanged<double> onChanged;
   const _SliderRow({
+    required this.c,
     required this.label,
     required this.display,
     required this.value,
@@ -1372,9 +2671,10 @@ class _SliderRow extends StatelessWidget {
     required this.onChanged,
     this.disabled = false,
   });
+
   @override
   Widget build(BuildContext context) {
-    final eff = disabled ? _C.textMuted : color;
+    final eff = disabled ? c.textMuted : color;
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 10, 8, 4),
       child: Row(
@@ -1389,7 +2689,7 @@ class _SliderRow extends StatelessWidget {
                   Text(
                     label,
                     style: TextStyle(
-                      color: _C.textSec,
+                      color: c.textSec,
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
                     ),
@@ -1407,34 +2707,25 @@ class _SliderRow extends StatelessWidget {
             ),
           ),
           Expanded(
-            child: MouseRegion(
-              cursor: disabled
-                  ? SystemMouseCursors.basic
-                  : SystemMouseCursors.click,
-              child: SliderTheme(
-                data: SliderTheme.of(context).copyWith(
-                  activeTrackColor: eff,
-                  inactiveTrackColor: _C.surfaceHi,
-                  thumbColor: eff,
-                  overlayColor: eff.withValues(alpha: 0.15),
-                  disabledActiveTrackColor: _C.surfaceHi,
-                  disabledInactiveTrackColor: _C.surfaceHi,
-                  disabledThumbColor: _C.textMuted,
-                  trackHeight: 3,
-                  thumbShape: const RoundSliderThumbShape(
-                    enabledThumbRadius: 6,
-                  ),
-                  overlayShape: const RoundSliderOverlayShape(
-                    overlayRadius: 14,
-                  ),
-                ),
-                child: Slider(
-                  value: value,
-                  min: min,
-                  max: max,
-                  divisions: divisions,
-                  onChanged: disabled ? null : onChanged,
-                ),
+            child: SliderTheme(
+              data: SliderTheme.of(context).copyWith(
+                activeTrackColor: eff,
+                inactiveTrackColor: c.surfaceHi,
+                thumbColor: eff,
+                overlayColor: eff.withValues(alpha: 0.15),
+                disabledActiveTrackColor: c.surfaceHi,
+                disabledInactiveTrackColor: c.surfaceHi,
+                disabledThumbColor: c.textMuted,
+                trackHeight: 3,
+                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
+              ),
+              child: Slider(
+                value: value,
+                min: min,
+                max: max,
+                divisions: divisions,
+                onChanged: disabled ? null : onChanged,
               ),
             ),
           ),
@@ -1444,40 +2735,74 @@ class _SliderRow extends StatelessWidget {
   }
 }
 
-// Chip
-class _Chip extends StatelessWidget {
+// GlossChip
+class _GlossChip extends StatelessWidget {
+  final AppColors c;
   final String label;
-  final bool selected, disabled;
+  final bool selected, disabled, isGlass, isDark;
   final VoidCallback? onTap;
   final Color color;
-  const _Chip({
+  const _GlossChip({
+    required this.c,
     required this.label,
     required this.selected,
     required this.onTap,
+    required this.isGlass,
+    required this.isDark,
     this.disabled = false,
-    this.color = _C.accent,
+    this.color = const Color(0xFF4F8EF7),
   });
+
   @override
   Widget build(BuildContext context) {
-    final eff = disabled ? _C.textMuted : color;
+    if (!isGlass) {
+      final eff = disabled ? c.textMuted : color;
+      return MouseRegion(
+        cursor: disabled ? SystemMouseCursors.basic : SystemMouseCursors.click,
+        child: GestureDetector(
+          onTap: onTap,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 130),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: selected ? eff : c.surfaceHi,
+              borderRadius: BorderRadius.circular(7),
+              border: Border.all(color: selected ? eff : c.border),
+            ),
+            child: Text(
+              label,
+              style: TextStyle(
+                color: selected
+                    ? Colors.white
+                    : (disabled ? c.textMuted : c.textSec),
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     return MouseRegion(
       cursor: disabled ? SystemMouseCursors.basic : SystemMouseCursors.click,
       child: GestureDetector(
         onTap: onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 130),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-          decoration: BoxDecoration(
-            color: selected ? eff : _C.surfaceHi,
-            borderRadius: BorderRadius.circular(7),
-            border: Border.all(color: selected ? eff : _C.border),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: GlassTokens.pillDecoration(
+            c,
+            selected: selected,
+            accent: disabled ? c.textMuted : color,
+            isDark: isDark,
           ),
           child: Text(
             label,
             style: TextStyle(
               color: selected
-                  ? Colors.white
-                  : (disabled ? _C.textMuted : _C.textSec),
+                  ? (disabled ? c.textMuted : color)
+                  : (isDark ? Colors.white.withValues(alpha: 0.65) : c.textSec),
               fontSize: 11,
               fontWeight: FontWeight.w600,
             ),
@@ -1488,158 +2813,228 @@ class _Chip extends StatelessWidget {
   }
 }
 
-// Time field
+// TimeField
 class _TimeField extends StatelessWidget {
+  final AppColors c;
   final TextEditingController controller;
   final String label;
   final IconData icon;
-  final bool disabled;
+  final bool disabled, isGlass, isDark;
   const _TimeField({
+    required this.c,
     required this.controller,
     required this.label,
     required this.icon,
     this.disabled = false,
+    this.isGlass = false,
+    this.isDark = true,
   });
+
   @override
-  Widget build(BuildContext context) => MouseRegion(
-    cursor: disabled ? SystemMouseCursors.basic : SystemMouseCursors.text,
-    child: TextField(
+  Widget build(BuildContext context) {
+    final fillColor = isGlass
+        ? (isDark
+              ? Colors.white.withValues(alpha: disabled ? 0.04 : 0.08)
+              : c.surface.withValues(alpha: disabled ? 0.40 : 0.65))
+        : (disabled ? c.disabled : c.surfaceHi);
+    final borderColor = isGlass
+        ? (isDark
+              ? Colors.white.withValues(alpha: disabled ? 0.08 : 0.18)
+              : c.border.withValues(alpha: disabled ? 0.40 : 0.70))
+        : c.border;
+    final labelColor = isGlass
+        ? (isDark
+              ? Colors.white.withValues(alpha: disabled ? 0.20 : 0.50)
+              : (disabled ? c.textMuted : c.textSec))
+        : c.textSec;
+    final iconColor = isGlass
+        ? (isDark ? Colors.white.withValues(alpha: 0.35) : c.textMuted)
+        : c.textMuted;
+
+    return TextField(
       controller: controller,
       enabled: !disabled,
       style: TextStyle(
-        color: disabled ? _C.textMuted : _C.textPri,
+        color: disabled ? c.textMuted : c.textPri,
         fontSize: 13,
         fontWeight: FontWeight.w500,
       ),
       decoration: InputDecoration(
         labelText: label,
         labelStyle: TextStyle(
-          color: _C.textSec,
+          color: labelColor,
           fontSize: 11,
           fontWeight: FontWeight.w600,
         ),
-        prefixIcon: Icon(icon, color: _C.textMuted, size: 14),
+        prefixIcon: Icon(icon, color: iconColor, size: 14),
         prefixIconConstraints: const BoxConstraints(
           minWidth: 30,
           minHeight: 30,
         ),
         filled: true,
-        fillColor: disabled ? _C.disabled : _C.surfaceHi,
+        fillColor: fillColor,
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 10,
           vertical: 10,
         ),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(9),
-          borderSide: BorderSide(color: _C.border),
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide(color: borderColor),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(9),
-          borderSide: BorderSide(color: _C.border),
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide(color: borderColor),
         ),
         disabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(9),
-          borderSide: BorderSide(color: _C.border.withValues(alpha: 0.5)),
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide(color: borderColor.withValues(alpha: 0.5)),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(9),
-          borderSide: const BorderSide(color: _C.accent, width: 1.5),
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide(color: c.accent, width: 1.5),
         ),
       ),
-    ),
-  );
+    );
+  }
 }
 
-// Compact text field
+// CompactField
 class _CompactField extends StatelessWidget {
+  final AppColors c;
   final String initialValue, hint;
   final ValueChanged<String> onChanged;
+  final bool isGlass, isDark;
   const _CompactField({
+    required this.c,
     required this.initialValue,
     required this.hint,
     required this.onChanged,
+    this.isGlass = false,
+    this.isDark = true,
   });
+
   @override
-  Widget build(BuildContext context) => MouseRegion(
-    cursor: SystemMouseCursors.text,
-    child: TextFormField(
+  Widget build(BuildContext context) {
+    final fillColor = isGlass
+        ? (isDark
+              ? Colors.white.withValues(alpha: 0.07)
+              : c.surface.withValues(alpha: 0.60))
+        : c.surfaceHi;
+    final borderColor = isGlass
+        ? (isDark
+              ? Colors.white.withValues(alpha: 0.18)
+              : c.border.withValues(alpha: 0.70))
+        : c.border;
+
+    return TextFormField(
       initialValue: initialValue,
       onChanged: onChanged,
-      style: const TextStyle(color: _C.textPri, fontSize: 13),
+      style: TextStyle(color: c.textPri, fontSize: 13),
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: TextStyle(color: _C.textMuted, fontSize: 13),
+        hintStyle: TextStyle(
+          color: isGlass
+              ? (isDark ? Colors.white.withValues(alpha: 0.28) : c.textMuted)
+              : c.textMuted,
+          fontSize: 13,
+        ),
         filled: true,
-        fillColor: _C.surfaceHi,
+        fillColor: fillColor,
         isDense: true,
         contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(9),
-          borderSide: BorderSide(color: _C.border),
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide(color: borderColor),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(9),
-          borderSide: BorderSide(color: _C.border),
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide(color: borderColor),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(9),
-          borderSide: const BorderSide(color: _C.accent, width: 1.5),
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide(color: c.accent, width: 1.5),
         ),
       ),
-    ),
-  );
+    );
+  }
 }
 
-// Small button
+// SmallBtn
 class _SmallBtn extends StatelessWidget {
+  final AppColors c;
   final String label;
   final VoidCallback? onTap;
   final Color color;
+  final bool isGlass, isDark;
   const _SmallBtn({
+    required this.c,
     required this.label,
     required this.onTap,
-    this.color = _C.accent,
+    required this.color,
+    required this.isGlass,
+    required this.isDark,
   });
+
   @override
-  Widget build(BuildContext context) => MouseRegion(
-    cursor: onTap != null ? SystemMouseCursors.click : SystemMouseCursors.basic,
-    child: GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: onTap == null ? 0.05 : 0.15),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: color.withValues(alpha: onTap == null ? 0.2 : 0.5),
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: onTap != null
+          ? SystemMouseCursors.click
+          : SystemMouseCursors.basic,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: onTap == null
+                ? (isGlass
+                      ? Colors.white.withValues(alpha: 0.05)
+                      : color.withValues(alpha: 0.05))
+                : color.withValues(alpha: isGlass ? 0.20 : 0.15),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: onTap == null
+                  ? (isGlass
+                        ? (isDark
+                              ? Colors.white.withValues(alpha: 0.12)
+                              : c.border)
+                        : color.withValues(alpha: 0.2))
+                  : color.withValues(alpha: 0.50),
+            ),
           ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: onTap == null ? _C.textMuted : color,
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
+          child: Text(
+            label,
+            style: TextStyle(
+              color: onTap == null ? c.textMuted : color,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ),
       ),
-    ),
-  );
+    );
+  }
 }
 
-// Action button
+// ActionBtn
 class _ActionBtn extends StatefulWidget {
+  final AppColors c;
   final String label;
   final IconData icon;
   final Color color;
   final VoidCallback? onPressed;
-  final bool compact;
+  final bool compact, isGlass, isDark;
+  final String? tooltip;
   const _ActionBtn({
+    required this.c,
     required this.label,
     required this.icon,
     required this.color,
+    required this.isGlass,
+    required this.isDark,
     this.onPressed,
     this.compact = false,
+    this.tooltip,
   });
   @override
   State<_ActionBtn> createState() => _ActionBtnState();
@@ -1647,49 +3042,227 @@ class _ActionBtn extends StatefulWidget {
 
 class _ActionBtnState extends State<_ActionBtn> {
   bool _hov = false;
+
   @override
   Widget build(BuildContext context) {
     final off = widget.onPressed == null;
-    final col = off ? _C.textMuted : widget.color;
-    return MouseRegion(
+    final col = off ? widget.c.textMuted : widget.color;
+
+    Widget btn = MouseRegion(
       cursor: off ? SystemMouseCursors.basic : SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hov = true),
       onExit: (_) => setState(() => _hov = false),
       child: GestureDetector(
         onTap: widget.onPressed,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          padding: EdgeInsets.symmetric(
-            horizontal: widget.compact ? 20 : 0,
-            vertical: 14,
-          ),
-          decoration: BoxDecoration(
-            color: off
-                ? _C.surfaceHi
-                : _hov
-                ? widget.color.withValues(alpha: 0.22)
-                : widget.color.withValues(alpha: 0.13),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: off
-                  ? _C.border
-                  : widget.color.withValues(alpha: _hov ? 0.7 : 0.45),
-            ),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(widget.icon, color: col, size: 18),
-              const SizedBox(width: 8),
-              Text(
-                widget.label,
-                style: TextStyle(
-                  color: col,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: -0.2,
+        child: widget.isGlass
+            ? GlassContainer(
+                useOwnLayer: true,
+                settings: LiquidGlassSettings(
+                  thickness: off ? 0.28 : (_hov ? 0.72 : 0.55),
+                  blur: off ? 4 : 8,
+                  glassColor: off
+                      ? Colors.white.withValues(alpha: 0.05)
+                      : col.withValues(alpha: _hov ? 0.25 : 0.18),
+                ),
+                shape: LiquidRoundedRectangle(borderRadius: 16),
+                child: Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: widget.compact ? 20 : 0,
+                    vertical: 14,
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(widget.icon, color: col, size: 18),
+                      const SizedBox(width: 8),
+                      Text(
+                        widget.label,
+                        style: TextStyle(
+                          color: col,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: -0.2,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            : AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                padding: EdgeInsets.symmetric(
+                  horizontal: widget.compact ? 20 : 0,
+                  vertical: 14,
+                ),
+                decoration: BoxDecoration(
+                  color: off
+                      ? widget.c.surfaceHi
+                      : _hov
+                      ? widget.color.withValues(alpha: 0.22)
+                      : widget.color.withValues(alpha: 0.13),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: off
+                        ? widget.c.border
+                        : widget.color.withValues(alpha: _hov ? 0.7 : 0.45),
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(widget.icon, color: col, size: 18),
+                    const SizedBox(width: 8),
+                    Text(
+                      widget.label,
+                      style: TextStyle(
+                        color: col,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.2,
+                      ),
+                    ),
+                  ],
                 ),
               ),
+      ),
+    );
+
+    if (widget.tooltip != null && !off) {
+      btn = Tooltip(message: widget.tooltip!, child: btn);
+    }
+    return btn;
+  }
+}
+
+// SettingsTile
+class _SettingsTile extends StatelessWidget {
+  final AppColors c;
+  final IconData icon;
+  final String label;
+  final String? subtitle;
+  final bool selected, isGlass, isDark;
+  final VoidCallback onTap;
+  const _SettingsTile({
+    required this.c,
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    required this.isGlass,
+    required this.isDark,
+    this.subtitle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (!isGlass) {
+      return MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          onTap: onTap,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: selected ? c.accentDim : c.surfaceHi,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: selected ? c.accent.withValues(alpha: 0.50) : c.border,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(icon, color: selected ? c.accent : c.textMuted, size: 18),
+                const SizedBox(height: 6),
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: selected ? c.accent : c.textSec,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                if (subtitle != null)
+                  Text(
+                    subtitle!,
+                    style: TextStyle(color: c.textMuted, fontSize: 10),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Glass settings tile
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: selected
+                ? c.accent.withValues(alpha: 0.18)
+                : (isDark
+                      ? Colors.white.withValues(alpha: 0.07)
+                      : c.surface.withValues(alpha: 0.65)),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: selected
+                  ? c.accent.withValues(alpha: 0.55)
+                  : (isDark
+                        ? Colors.white.withValues(alpha: 0.16)
+                        : c.borderHi.withValues(alpha: 0.70)),
+              width: selected ? 1.5 : 1.0,
+            ),
+            boxShadow: selected
+                ? [
+                    BoxShadow(
+                      color: c.accent.withValues(alpha: 0.18),
+                      blurRadius: 12,
+                      spreadRadius: -2,
+                    ),
+                  ]
+                : null,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                icon,
+                color: selected
+                    ? c.accent
+                    : (isDark
+                          ? Colors.white.withValues(alpha: 0.45)
+                          : c.textSec),
+                size: 18,
+              ),
+              const SizedBox(height: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  color: selected
+                      ? c.accent
+                      : (isDark
+                            ? Colors.white.withValues(alpha: 0.75)
+                            : c.textSec),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              if (subtitle != null)
+                Text(
+                  subtitle!,
+                  style: TextStyle(
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.30)
+                        : c.textMuted,
+                    fontSize: 10,
+                  ),
+                ),
             ],
           ),
         ),
@@ -1698,149 +3271,152 @@ class _ActionBtnState extends State<_ActionBtn> {
   }
 }
 
-// Log panel bottom sheet
-class _LogPanel extends StatelessWidget {
-  final List<String> logs;
-  const _LogPanel({required this.logs});
+// SectionLabel
+class _SectionLabel extends StatelessWidget {
+  final AppColors c;
+  final String label;
+  const _SectionLabel({required this.c, required this.label});
+
   @override
-  Widget build(BuildContext context) => DraggableScrollableSheet(
-    expand: false,
-    initialChildSize: 0.55,
-    maxChildSize: 0.9,
-    minChildSize: 0.3,
-    builder: (_, ctrl) => Column(
+  Widget build(BuildContext context) => Text(
+    label,
+    style: TextStyle(
+      color: c.textMuted,
+      fontSize: 10,
+      fontWeight: FontWeight.w700,
+      letterSpacing: 1.2,
+    ),
+  );
+}
+
+// ShortcutRow
+class _ShortcutRow extends StatelessWidget {
+  final AppColors c;
+  final String key_, label;
+  const _ShortcutRow({
+    required this.c,
+    required this.key_,
+    required this.label,
+  });
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 6),
+    child: Row(
       children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          child: Container(
-            width: 36,
-            height: 4,
-            decoration: BoxDecoration(
-              color: _C.border,
-              borderRadius: BorderRadius.circular(2),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(
+            color: c.surfaceHi,
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: c.border),
+          ),
+          child: Text(
+            key_,
+            style: TextStyle(
+              color: c.textSec,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              fontFamily: 'monospace',
             ),
           ),
         ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-          child: Row(
-            children: [
-              const Icon(Icons.terminal_rounded, color: _C.accent, size: 16),
-              const SizedBox(width: 8),
-              const Text(
-                'Process Log',
-                style: TextStyle(
-                  color: _C.textPri,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                ),
+        const SizedBox(width: 10),
+        Text(label, style: TextStyle(color: c.textSec, fontSize: 12)),
+      ],
+    ),
+  );
+}
+
+// RecentVideosRow
+class _RecentVideosRow extends StatelessWidget {
+  final AppColors c;
+  final List<String> recents;
+  final ValueChanged<String> onSelect;
+  final VoidCallback onClear;
+  const _RecentVideosRow({
+    required this.c,
+    required this.recents,
+    required this.onSelect,
+    required this.onClear,
+  });
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(14, 8, 14, 10),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.history_rounded, size: 12, color: c.textMuted),
+            const SizedBox(width: 4),
+            Text(
+              'Recent',
+              style: TextStyle(
+                color: c.textMuted,
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.3,
               ),
-              const Spacer(),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: _C.surfaceHi,
-                  borderRadius: BorderRadius.circular(6),
-                ),
+            ),
+            const Spacer(),
+            MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: GestureDetector(
+                onTap: onClear,
                 child: Text(
-                  '${logs.length} lines',
+                  'Clear',
                   style: TextStyle(
-                    color: _C.textSec,
-                    fontSize: 11,
+                    color: c.textMuted,
+                    fontSize: 10,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
-        Divider(color: _C.border, height: 1),
-        Expanded(
-          child: logs.isEmpty
-              ? Center(
-                  child: Text(
-                    'No logs yet.',
-                    style: TextStyle(color: _C.textMuted, fontSize: 13),
-                  ),
-                )
-              : ListView.builder(
-                  controller: ctrl,
+        const SizedBox(height: 6),
+        Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: recents.take(4).map((p) {
+            final name = p.split('/').last.split('\\').last;
+            return MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: GestureDetector(
+                onTap: () => onSelect(p),
+                child: Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
+                    horizontal: 8,
+                    vertical: 4,
                   ),
-                  itemCount: logs.length,
-                  itemBuilder: (_, i) {
-                    final line = logs[i];
-                    final isErr = line.startsWith('[ERR]');
-                    final isWarn = line.startsWith('[WARN]');
-                    final isInfo =
-                        line.startsWith('[INFO]') ||
-                        line.startsWith('[Android]') ||
-                        line.startsWith('[Copy]');
-                    final color = isErr
-                        ? _C.red
-                        : isWarn
-                        ? _C.orange
-                        : isInfo
-                        ? _C.accent
-                        : _C.textSec;
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 3),
-                      child: Text(
-                        line,
-                        style: TextStyle(
-                          color: color,
-                          fontSize: 11,
-                          fontFamily: 'monospace',
-                          height: 1.5,
+                  decoration: BoxDecoration(
+                    color: c.surfaceHi,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: c.border),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.movie_outlined, size: 11, color: c.textMuted),
+                      const SizedBox(width: 4),
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 160),
+                        child: Text(
+                          name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(color: c.textSec, fontSize: 11),
                         ),
                       ),
-                    );
-                  },
-                ),
-        ),
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: MouseRegion(
-            cursor: SystemMouseCursors.click,
-            child: GestureDetector(
-              onTap: () {
-                Clipboard.setData(ClipboardData(text: logs.join('\n')));
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Logs copied to clipboard'),
-                    duration: Duration(seconds: 2),
-                    behavior: SnackBarBehavior.floating,
+                    ],
                   ),
-                );
-              },
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                decoration: BoxDecoration(
-                  color: _C.surfaceHi,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: _C.border),
-                ),
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.copy_rounded, color: _C.textSec, size: 14),
-                    SizedBox(width: 6),
-                    Text(
-                      'Copy all logs',
-                      style: TextStyle(
-                        color: _C.textSec,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
                 ),
               ),
-            ),
-          ),
+            );
+          }).toList(),
         ),
       ],
     ),

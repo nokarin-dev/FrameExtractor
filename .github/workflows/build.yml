@@ -488,26 +488,19 @@ jobs:
         with:
           name: "Frame Extractor ${{ github.ref_name }}"
           body: |
-            ![latest download](https://img.shields.io/github/downloads/nokarin-dev/frameextractor/${{ github.ref_name }}/total?style=flat-square&color=3258a8)
             ${{ env.CHANGELOG }}
 
             ---
 
             ## Downloads
+            ### Windwos
+            [![Windows-Installer](https://img.shields.io/github/downloads/nokarin-dev/frameextractor/${{ github.ref_name }}/FrameExtractor-windows-installer.exe?displayAssetName=true&style=flat-square&logo=data%3Aimage%2Fpng%3Bbase64%2CiVBORw0KGgoAAAANSUhEUgAAAGQAAABkCAYAAABw4pVUAAAACXBIWXMAAAsTAAALEwEAmpwYAAAA40lEQVR4nO3RgQkAIRDAsNt%2FaX8HebBKMkGhMwAAADErbi7vNeQwQ2IMiTEkxpAYQ2IMiTEkxpAYQ2IMiTEkxpAYQ2IMiTEkxpAYQ2IMiTEkxpAYQ2IMiTEkxpAYQ2IMiTEkxpAYQ2IMiTEkxpAYQ2IMiTEkxpAYQ2IMeW0IAOxacXN5ryGHGRJjSIwhMYbEGBJjSIwhMYbEGBJjSIwhMYbEGBJjSIwhMYbEGBJjSIwhMYbEGBJjSIwhMYbEGBJjSIwhMYbEGBJjSIwhMYbEGBJjSIwhMYbEGBJjyGtDAAAA5l8fzPuhzmfqIykAAAAASUVORK5CYII%3D&label=%20&color=blue)](https://github.com/nokarin-dev/FrameExtractor/releases/${{ github.ref_name }}/download/FrameExtractor-windows-installer.exe) [![Windows-Portable](https://img.shields.io/github/downloads/nokarin-dev/frameextractor/${{ github.ref_name }}/FrameExtractor-windows-portable.zip?displayAssetName=true&style=flat-square&logo=data%3Aimage%2Fpng%3Bbase64%2CiVBORw0KGgoAAAANSUhEUgAAAGQAAABkCAYAAABw4pVUAAAACXBIWXMAAAsTAAALEwEAmpwYAAAA40lEQVR4nO3RgQkAIRDAsNt%2FaX8HebBKMkGhMwAAADErbi7vNeQwQ2IMiTEkxpAYQ2IMiTEkxpAYQ2IMiTEkxpAYQ2IMiTEkxpAYQ2IMiTEkxpAYQ2IMiTEkxpAYQ2IMiTEkxpAYQ2IMiTEkxpAYQ2IMiTEkxpAYQ2IMeW0IAOxacXN5ryGHGRJjSIwhMYbEGBJjSIwhMYbEGBJjSIwhMYbEGBJjSIwhMYbEGBJjSIwhMYbEGBJjSIwhMYbEGBJjSIwhMYbEGBJjSIwhMYbEGBJjSIwhMYbEGBJjyGtDAAAA5l8fzPuhzmfqIykAAAAASUVORK5CYII%3D&label=%20&color=blue) ](https://github.com/nokarin-dev/FrameExtractor/releases/${{ github.ref_name }}/download/FrameExtractor-windows-portable.zip)
 
-            | Platform | File | Notes |
-            |---|---|---|
-            | 🪟 Windows | `FrameExtractor-windows-installer.zip` | Extract & run `.exe` |
-            | 🪟 Windows Portable | `FrameExtractor-windows-portable.zip` | No install needed |
-            | 🐧 Linux (.deb) | `FrameExtractor-linux-installer.deb` | `sudo dpkg -i *.deb` - installs to `/opt/frameextractor` |
-            | 🐧 Linux (.AppImage) | `FrameExtractor-linux.AppImage` | Single file, runs on any distro |
-            | 🐧 Linux Portable | `FrameExtractor-linux-portable.tar.gz` | Extract & run anywhere |
-            | 🤖 Android (arm64) | `FrameExtractor-android-arm64.apk` | Most modern phones (2018+) |
-            | 🤖 Android (arm32) | `FrameExtractor-android-arm32.apk` | Older 32-bit phones |
-            | 🤖 Android (x86_64) | `FrameExtractor-android-x86_64.apk` | Emulators / Chromebooks |
+            ### Linux
+            [![Linux-Debian](https://img.shields.io/github/downloads/nokarin-dev/frameextractor/${{ github.ref_name }}/FrameExtractor-linux-installer.deb?displayAssetName=true&style=flat-square&logo=linux&logoColor=white&label=%20&color=e07334)](https://github.com/nokarin-dev/FrameExtractor/releases/${{ github.ref_name }}/download/FrameExtractor-linux-installer.deb) [![Linux-AppImage](https://img.shields.io/github/downloads/nokarin-dev/frameextractor/${{ github.ref_name }}/FrameExtractor-linux.AppImage?displayAssetName=true&style=flat-square&logo=linux&logoColor=white&label=%20&color=e07334)](https://github.com/nokarin-dev/FrameExtractor/releases/${{ github.ref_name }}/download/FrameExtractor-linux.AppImage) [![Linux-Portable](https://img.shields.io/github/downloads/nokarin-dev/frameextractor/${{ github.ref_name }}/FrameExtractor-linux-portable.tar.gz?displayAssetName=true&style=flat-square&logo=linux&logoColor=white&label=%20&color=e07334)](https://github.com/nokarin-dev/FrameExtractor/releases/${{ github.ref_name }}/download/FrameExtractor-linux-portable.tar.gz)
 
-            > **Windows/Linux:** ffmpeg & yt-dlp bundled inside the zip/dmg.
-            > **Android:** yt-dlp bundled in APK, ffmpeg via ffmpeg_kit.
+            ### Android
+            [![Android-ARM64](https://img.shields.io/github/downloads/nokarin-dev/frameextractor/${{ github.ref_name }}/FrameExtractor-android-arm64.apk?displayAssetName=true&style=flat-square&logo=android&logoColor=white&label=%20&color=dark-green)](https://github.com/nokarin-dev/FrameExtractor/releases/${{ github.ref_name }}/download/FrameExtractor-android-arm64.apk) [![Android-ARM32](https://img.shields.io/github/downloads/nokarin-dev/frameextractor/${{ github.ref_name }}/FrameExtractor-android-arm32.apk?displayAssetName=true&style=flat-square&logo=android&logoColor=white&label=%20&color=dark-green)](https://github.com/nokarin-dev/FrameExtractor/releases/${{ github.ref_name }}/download/FrameExtractor-android-arm32.apk) [![Android-X86_64](https://img.shields.io/github/downloads/nokarin-dev/frameextractor/${{ github.ref_name }}/FrameExtractor-android-x86_64.apk?displayAssetName=true&style=flat-square&logo=android&logoColor=white&label=%20&color=dark-green)](https://github.com/nokarin-dev/FrameExtractor/releases/${{ github.ref_name }}/download/FrameExtractor-android-x86_64.apk)
           draft: false
           prerelease: ${{ contains(github.ref_name, '-') }}
           files: |

@@ -12,11 +12,24 @@ This project loosely follows Keep a Changelog and uses Semantic Versioning.
 - Fixed Linux AppImage launch error `Is a directory` - `$EXE_NAME` was set in CI shell but not expanded inside the AppRun heredoc (single-quoted heredoc prevents variable substitution). AppRun now detects the executable at runtime using `find`
 
 #### Added
+- Style Switcher
+    - Classic Style (Default)
+    - Liquid Glass Style (EXPERIMENTAL)
+- Theme Switcher
+    - Dark Theme
+    - Light Theme
+- Keyboard Shortcut
+    - Space (Extract)
+    - Esc (Cancel Extraction)
+    - Ctrl+L (Open Log Panel)
+    - Ctrl+S (Open Settings Panel)
 - Application Icons
 
 ### Changes
 #### Android
 - Upgrade android plugins to latest version
+- Log & Settings now show as dialog in desktop
+- Splash Screen now following current theme & style
 
 ---
 
