@@ -7,6 +7,11 @@ This project loosely follows Keep a Changelog and uses Semantic Versioning.
 ---
 
 ## [Unreleased]
+
+No Changes Yet.
+
+---
+## [1.1.2] - 2026-03-26
 ### Fixed
 #### CI/CD
 - Fixed Linux AppImage launch error `Is a directory` - `$EXE_NAME` was set in CI shell but not expanded inside the AppRun heredoc (single-quoted heredoc prevents variable substitution). AppRun now detects the executable at runtime using `find`
@@ -30,8 +35,6 @@ This project loosely follows Keep a Changelog and uses Semantic Versioning.
 - Upgrade android plugins to latest version
 - Log & Settings now show as dialog in desktop
 - Splash Screen now following current theme & style
-
----
 
 ## [1.1.1] - 2026-03-22
 ### Fixed
@@ -143,6 +146,7 @@ On first launch, required binaries are extracted to:
 
 ---
 
-[Unreleased]: https://github.com/nokarin-dev/frameextractor/compare/v1.1.1...HEAD
+[Unreleased]: https://github.com/nokarin-dev/frameextractor/compare/v1.1.2...HEAD
+[1.1.2]: https://github.com/nokarin-dev/frameextractor/releases/tag/v1.1.2
 [1.1.1]: https://github.com/nokarin-dev/frameextractor/releases/tag/v1.1.1
 [1.1.0]: https://github.com/nokarin-dev/frameextractor/releases/tag/v1.1.0
