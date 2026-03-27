@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:frameextractor/data/services/update_service.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'package:frameextractor/core/app_constants.dart';
@@ -104,6 +105,7 @@ class _InitGateState extends State<_InitGate> {
 
       if (!mounted) return;
 
+      UpdateService.checkInBackground();
       Navigator.of(context).pushReplacement(
         PageRouteBuilder(
           pageBuilder: (_, _, _) => BlocProvider(

@@ -7,6 +7,10 @@ This project loosely follows Keep a Changelog and uses Semantic Versioning.
 ---
 
 ## [Unreleased]
+### Added
+#### Core
+- Update checker
+
 ### Changed
 - New FrameExtractor Application Icon
 

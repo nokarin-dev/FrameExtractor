@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:frameextractor/data/services/update_service.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
@@ -19,7 +20,7 @@ import 'package:frameextractor/presentation/theme/app_theme.dart';
 
 enum _SourceMode { local, youtube }
 
-bool get _isDesktop => !Platform.isAndroid && !Platform.isIOS;
+bool get _isDesktop => !Platform.isAndroid;
 
 // HomeScreen
 class HomeScreen extends StatefulWidget {
@@ -50,6 +51,7 @@ class _HomeScreenState extends State<HomeScreen>
   bool _openFolderOnDone = true;
   String _framePrefix = AppConstants.defaultPrefix;
   List<String> _recentVideos = [];
+  UpdateResult? _updateResult;
 
   bool get _isExtracting =>
       context.read<ExtractionBloc>().state is ExtractionInProgress;
@@ -90,6 +92,13 @@ class _HomeScreenState extends State<HomeScreen>
       end: 1.0,
     ).animate(CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut));
     _loadPrefs();
+    _updateResult = UpdateService.cachedResult;
+    UpdateService.resultNotifier.addListener(_onUpdateResult);
+  }
+
+  void _onUpdateResult() {
+    if (!mounted) return;
+    setState(() => _updateResult = UpdateService.resultNotifier.value);
   }
 
   Future<void> _loadPrefs() async {
@@ -103,6 +112,7 @@ class _HomeScreenState extends State<HomeScreen>
 
   @override
   void dispose() {
+    UpdateService.resultNotifier.removeListener(_onUpdateResult);
     _pulseCtrl.dispose();
     _ytUrlCtrl.dispose();
     _startTimeCtrl.dispose();
@@ -241,12 +251,13 @@ class _HomeScreenState extends State<HomeScreen>
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
                   AppConstants.appName,
                   style: TextStyle(
                     color: c.textPri,
-                    fontSize: 13,
+                    fontSize: 15,
                     fontWeight: FontWeight.w700,
                     letterSpacing: -0.2,
                   ),
@@ -258,6 +269,16 @@ class _HomeScreenState extends State<HomeScreen>
               ],
             ),
           ),
+          if (_updateResult?.available == true) ...[
+            _UpdateBadge(
+              c: c,
+              version: _updateResult!.latestVersion,
+              releaseUrl: _updateResult!.releaseUrl,
+              isGlass: isGlass,
+              isDark: theme.isDark,
+            ),
+            const SizedBox(width: 10),
+          ],
           _TitleBarBtn(
             c: c,
             icon: Icons.terminal_rounded,
@@ -1326,8 +1347,6 @@ class _HomeScreenState extends State<HomeScreen>
   void _openFolder(String path) {
     if (Platform.isWindows) {
       Process.run('explorer', [path]);
-    } else if (Platform.isMacOS) {
-      Process.run('open', [path]);
     } else {
       Process.run('xdg-open', [path]);
     }
@@ -3421,4 +3440,113 @@ class _RecentVideosRow extends StatelessWidget {
       ],
     ),
   );
+}
+
+// Update Badge
+class _UpdateBadge extends StatefulWidget {
+  final AppColors c;
+  final String? version;
+  final String releaseUrl;
+  final bool isGlass, isDark;
+
+  const _UpdateBadge({
+    required this.c,
+    required this.version,
+    required this.releaseUrl,
+    required this.isGlass,
+    required this.isDark,
+  });
+
+  @override
+  State<_UpdateBadge> createState() => _UpdateBadgeState();
+}
+
+class _UpdateBadgeState extends State<_UpdateBadge>
+    with SingleTickerProviderStateMixin {
+  bool _hov = false;
+  late AnimationController _ctrl;
+  late Animation<double> _pulse;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    )..repeat(reverse: true);
+    _pulse = CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  void _open() {
+    final url = widget.releaseUrl;
+    if (Platform.isWindows) {
+      Process.run('explorer', [url]);
+    } else {
+      Process.run('xdg-open', [url]);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final orange = widget.c.orange;
+    final tip = widget.version != null
+        ? 'v${widget.version} Available - Click to download'
+        : 'New version available - Click to download';
+
+    return Tooltip(
+      message: tip,
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        onEnter: (_) => setState(() => _hov = true),
+        onExit: (_) => setState(() => _hov = false),
+        child: GestureDetector(
+          onTap: _open,
+          child: AnimatedBuilder(
+            animation: _pulse,
+            builder: (_, _) => AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+              decoration: BoxDecoration(
+                color: _hov
+                    ? orange.withValues(alpha: 0.28)
+                    : Color.lerp(
+                        orange.withValues(alpha: 0.10),
+                        orange.withValues(alpha: 0.22),
+                        _pulse.value,
+                      ),
+                borderRadius: BorderRadius.circular(50),
+                border: Border.all(
+                  color: orange.withValues(
+                    alpha: _hov ? 0.75 : (0.30 + _pulse.value * 0.20),
+                  ),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.arrow_circle_up_rounded, color: orange, size: 10),
+                  const SizedBox(width: 4),
+                  Text(
+                    'out-of-date',
+                    style: TextStyle(
+                      color: orange,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.2,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
