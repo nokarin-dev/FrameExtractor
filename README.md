@@ -1,26 +1,27 @@
-![FrameExtractor Banner](https://github.com/user-attachments/assets/101f833d-0ac6-4b51-a2ff-df70b71d796d?raw=true)
+![FrameExtractor Banner](https://github.com/user-attachments/assets/d458829a-c268-4590-911e-1e00fc964312)
 
 <div align="center">
 
 **A modern, cross-platform video frame extractor with a clean UI - powered by ffmpeg & yt-dlp.**
 
-[![Release](https://img.shields.io/github/v/release/nokarin-dev/frameextractor?style=flat-square&color=4F8EF7)](https://github.com/nokarin-dev/frameextractor/releases/latest)
-[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg?style=flat-square)](LICENSE)
-[![Flutter](https://img.shields.io/badge/Flutter-3.22-02569B?style=flat-square&logo=flutter)](https://flutter.dev)
-[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20Android-02569B?style=flat-square)](#download)
+[![Release](https://img.shields.io/github/v/release/nokarin-dev/frameextractor?style=for-the-badge&color=4F8EF7)](https://github.com/nokarin-dev/frameextractor/releases/latest)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg?style=for-the-badge)](LICENSE)
+[![Flutter](https://img.shields.io/badge/Flutter-3.22-02569B?style=for-the-badge&logo=flutter)](https://flutter.dev)
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20Android-02569B?style=for-the-badge)](#download)
 
-[![Total Downloads](https://img.shields.io/github/downloads/nokarin-dev/frameextractor/total?style=flat-square&logoColor=%3D&color=3471eb
+[![Total Downloads](https://img.shields.io/github/downloads/nokarin-dev/frameextractor/total?style=for-the-badge&logoColor=%3D&color=3471eb
 )](/releases)
-[![Latest Downloads](https://img.shields.io/github/downloads/nokarin-dev/frameextractor/latest/total?style=flat-square&color=3d47d4
+[![Latest Downloads](https://img.shields.io/github/downloads/nokarin-dev/frameextractor/latest/total?style=for-the-badge&color=3d47d4
 )](/releases/latest)
-[![Test Status](https://img.shields.io/github/actions/workflow/status/nokarin-dev/frameextractor/build-test.yml?style=flat-square&label=test%20build&color=22316e
+[![Test Status](https://img.shields.io/github/actions/workflow/status/nokarin-dev/frameextractor/build-test.yml?style=for-the-badge&label=test%20build&color=22316e
 )](https://github.com/nokarin-dev/FrameExtractor/actions/workflows/build-test.yml)
 
 </div>
 
 ---
 
-## Features
+<img width="1536" height="100" alt="Features" src="https://github.com/user-attachments/assets/675712a8-29e3-4d60-a6cf-b6fee50516c9" />
+
 - 🎬 **Extract frames** from any local video file with precise start/end timestamps
 - 📺 **YouTube support** - paste a URL, pick quality, extract directly (yt-dlp powered)
 - ⚡ **Adjustable FPS** - from 1 to 60 frames per second
@@ -34,7 +35,8 @@
 
 ---
 
-## Download
+<img width="1536" height="100" alt="Downloads" src="https://github.com/user-attachments/assets/fdc58dff-3ba3-4b2a-98aa-d2992f02c1c0" />
+
 Head to the [**Releases**](https://github.com/nokarin-dev/frameextractor/releases/latest) page and grab the build for your platform.
 
 | Platform            | File                                    | Notes                                                       |
@@ -49,7 +51,8 @@ Head to the [**Releases**](https://github.com/nokarin-dev/frameextractor/release
 
 ---
 
-## Building from source
+<img width="1536" height="100" alt="Build from source" src="https://github.com/user-attachments/assets/0046c3b4-52c8-4aa2-8ece-b7f0ba9e39c9" />
+
 ### Prerequisites
 - [Flutter 3.22+](https://docs.flutter.dev/get-started/install)
 - Python 3.8+ (for the binary download script)
@@ -88,22 +91,20 @@ flutter build windows --release --dart-define=PORTABLE=true
 flutter build apk --release # Android
 ```
 
-### Installer vs Portable (Windows & Linux)
-|                      | Installer                                                              | Portable                  |
-|----------------------|------------------------------------------------------------------------|---------------------------|
-| Binary location      | `AppData/Local/FrameExtractor/bin/` (Win) or `~/.local/share/` (Linux) | Same folder as executable |
-| Pass `--dart-define` | `PORTABLE=false`                                                       | `PORTABLE=true`           |
-
 ---
 
-## Platform status
+<img width="1536" height="100" alt="Github Banner_ Platform Status" src="https://github.com/user-attachments/assets/66a64334-f413-4096-8618-0896fbfe8f7d" />
+
 | Platform | Tested |
 |----------|--------|
 | Windows  | ✅      |
 | Linux    | ✅      |
 | Android  | ✅      |
 
-## License
+---
+
+<img width="1536" height="100" alt="Github Banner_ License" src="https://github.com/user-attachments/assets/1cab9016-2f94-445f-b39f-49c6ee6fda7e" />
+
 ```
 FrameExtractor
 Copyright © 2025-2026 nokarin-dev
