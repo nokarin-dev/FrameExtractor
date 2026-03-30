@@ -488,9 +488,12 @@ jobs:
         with:
           name: "Frame Extractor ${{ github.ref_name }}"
           body: |
+            <img width="1536" height="100" alt="Changelog" src="https://github.com/user-attachments/assets/9e9b3837-cfbc-4b17-8dfd-03deae7c67c5" />
+
             ${{ env.CHANGELOG }}
 
             ---
+            <img width="1536" height="100" alt="Downloads" src="https://github.com/user-attachments/assets/fdc58dff-3ba3-4b2a-98aa-d2992f02c1c0" />
 
             ## Downloads
             ### Windwos

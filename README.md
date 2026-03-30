@@ -119,7 +119,7 @@ flutter build apk --release # Android
 
 ---
 
-<img width="1536" height="100" alt="License" src="https://github.com/user-attachments/assets/1cab9016-2f94-445f-b39f-49c6ee6fda7e" />
+<img width="1536" height="100" alt="License" src="https://github.com/user-attachments/assets/2f42a033-c32f-47c1-8c93-27fa53d538b4" />
 
 ```
 FrameExtractor
