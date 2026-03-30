@@ -93,7 +93,7 @@ flutter build apk --release # Android
 
 ---
 
-<img width="1536" height="100" alt="Github Banner_ Platform Status" src="https://github.com/user-attachments/assets/66a64334-f413-4096-8618-0896fbfe8f7d" />
+<img width="1536" height="100" alt="Platform Status" src="https://github.com/user-attachments/assets/66a64334-f413-4096-8618-0896fbfe8f7d" />
 
 | Platform | Tested |
 |----------|--------|
@@ -103,7 +103,23 @@ flutter build apk --release # Android
 
 ---
 
-<img width="1536" height="100" alt="Github Banner_ License" src="https://github.com/user-attachments/assets/1cab9016-2f94-445f-b39f-49c6ee6fda7e" />
+<img width="1536" height="100" alt="Preview" src="https://github.com/user-attachments/assets/51d91558-920f-4204-8512-fa0e965872f3" />
+
+### Home Screen - Local
+<img width="1920" height="1043" alt="Home Screen Local" src="https://github.com/user-attachments/assets/7f9eda10-56f2-48af-bba6-da76f0d9af1f" />
+
+### Home Screen - YouTube
+<img width="1920" height="1043" alt="Home Screen Youtube" src="https://github.com/user-attachments/assets/cec072af-d0e6-487b-9ca4-367fe1fb3ae3" />
+
+### Settings Screen
+<img width="1920" height="1043" alt="Settings Screen" src="https://github.com/user-attachments/assets/4e55668d-f5c5-440f-b28e-3b82bea546e7" />
+
+### Log Screen
+<img width="1920" height="1043" alt="Log Screen" src="https://github.com/user-attachments/assets/2bce129c-cfee-4b16-914a-95a7b29ee5dc" />
+
+---
+
+<img width="1536" height="100" alt="License" src="https://github.com/user-attachments/assets/1cab9016-2f94-445f-b39f-49c6ee6fda7e" />
 
 ```
 FrameExtractor
