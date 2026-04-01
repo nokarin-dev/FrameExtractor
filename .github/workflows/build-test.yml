@@ -119,7 +119,14 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: fedora:latest
+    env:
+      GIT_CONFIG_GLOBAL: /root/.gitconfig-ci
     steps:
+      - name: Configure Git safe directory
+        run: |
+          git config --global --add safe.directory '*'
+          cat /root/.gitconfig-ci
+
       - uses: actions/checkout@v4
 
       - name: Install build dependencies
@@ -142,10 +149,6 @@ jobs:
           flutter-version: "3.x"
           channel: stable
           cache: true
-
-      - name: Configure Git safe directory
-        run: |
-          sudo git config --global --add safe.directory '*'
 
       - name: Get Flutter dependencies
         run: flutter pub get
