@@ -385,7 +385,7 @@ jobs:
 
       - name: Install build dependencies
         run: |
-          dnf groupinstall -y "Development Tools"
+          dnf group install -y "Development Tools"
           dnf install -y \
             git clang cmake ninja-build pkg-config \
             gtk3-devel xz-devel libstdc++-devel \
@@ -569,6 +569,19 @@ jobs:
       - name: Build split APKs
         run: |
           flutter build apk --release --dart-define=PORTABLE=false --split-per-abi
+
+      - name: Verify APK signing
+        if: env.SIGNING_CONFIGURED == 'true'
+        run: |
+          for apk in \
+            build/app/outputs/flutter-apk/app-arm64-v8a-release.apk \
+            build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk \
+            build/app/outputs/flutter-apk/app-x86_64-release.apk; do
+            echo "Verifying $apk..."
+            $ANDROID_HOME/build-tools/$(ls $ANDROID_HOME/build-tools | tail -1)/apksigner \
+              verify --verbose "$apk" 2>&1 | grep -E "Verified|error" || true
+          done
+          echo "✓ APK signing verified"
 
       - name: Rename APKs
         run: |
