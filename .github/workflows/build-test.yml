@@ -131,7 +131,7 @@ jobs:
       - name: Download dummy binaries
         uses: actions/download-artifact@v4
         with:
-          name: binaries
+          name: dummy-binaries
           path: assets/binaries
 
       - name: Set up Flutter
