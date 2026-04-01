@@ -120,21 +120,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Flutter system dependencies
+      - name: Install build dependencies
         run: |
           sudo dnf install @development-tools -y
           sudo dnf install -y \
             clang cmake ninja-build pkg-config \
             gtk3-devel xz-devel libstdc++-devel \
-            rpm-build
+            rpm-build jq
 
       - name: Download dummy binaries
         uses: actions/download-artifact@v4
         with:
-          name: dummy-binaries
+          name: binaries
           path: assets/binaries
 
-      - uses: subosito/flutter-action@v2
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
         with:
           flutter-version: "3.x"
           channel: stable
