@@ -122,11 +122,6 @@ jobs:
     env:
       GIT_CONFIG_GLOBAL: /root/.gitconfig-ci
     steps:
-      - name: Configure Git safe directory
-        run: |
-          git config --global --add safe.directory '*'
-          cat /root/.gitconfig-ci
-
       - uses: actions/checkout@v4
 
       - name: Install build dependencies
@@ -136,6 +131,11 @@ jobs:
             clang cmake ninja-build pkg-config \
             gtk3-devel xz-devel libstdc++-devel \
             rpm-build jq
+
+      - name: Configure Git safe directory
+        run: |
+          git config --global --add safe.directory '*'
+          cat /root/.gitconfig-ci
 
       - name: Download dummy binaries
         uses: actions/download-artifact@v4

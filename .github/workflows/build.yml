@@ -380,6 +380,8 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: fedora:latest
+    env:
+      GIT_CONFIG_GLOBAL: /root/.gitconfig-ci
     steps:
       - uses: actions/checkout@v4
 
@@ -391,16 +393,17 @@ jobs:
             gtk3-devel xz-devel libstdc++-devel \
             rpm-build desktop-file-utils hicolor-icon-theme jq
 
+      - name: Configure Git safe directory
+        run: |
+          git config --global --add safe.directory '*'
+          cat /root/.gitconfig-ci
+
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version: "3.x"
           channel: stable
           cache: true
-
-      - name: Configure Git safe directory
-        run: |
-          sudo git config --global --add safe.directory '*'
 
       - name: Download dummy binaries
         uses: actions/download-artifact@v4
