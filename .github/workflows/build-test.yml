@@ -122,7 +122,7 @@ jobs:
 
       - name: Install Flutter system dependencies
         run: |
-          sudo dnf group install -y "Development Tools"
+          sudo dnf install @development-tools -y
           sudo dnf install -y \
             clang cmake ninja-build pkg-config \
             gtk3-devel xz-devel libstdc++-devel \

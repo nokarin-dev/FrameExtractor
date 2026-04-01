@@ -385,8 +385,8 @@ jobs:
 
       - name: Install build dependencies
         run: |
-          dnf group install -y "Development Tools"
-          dnf install -y \
+          sudo dnf install @development-tools -y
+          sudo dnf install -y \
             git clang cmake ninja-build pkg-config \
             gtk3-devel xz-devel libstdc++-devel \
             rpm-build desktop-file-utils hicolor-icon-theme
