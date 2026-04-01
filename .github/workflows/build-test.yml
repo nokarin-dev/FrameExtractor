@@ -92,7 +92,9 @@ jobs:
           flutter-version: "3.x"
           channel: stable
           cache: true
-      - run: flutter pub get
+
+      - name: Get Flutter dependencies
+        run: flutter pub get
 
       - name: Build Linux (debug)
         run: flutter build linux --debug --dart-define=PORTABLE=false
@@ -128,10 +130,6 @@ jobs:
             gtk3-devel xz-devel libstdc++-devel \
             rpm-build jq
 
-      - name: Configure Git safe directory
-        run: |
-          sudo git config --global --add safe.directory '*'
-
       - name: Download dummy binaries
         uses: actions/download-artifact@v4
         with:
@@ -144,7 +142,13 @@ jobs:
           flutter-version: "3.x"
           channel: stable
           cache: true
-      - run: flutter pub get
+
+      - name: Configure Git safe directory
+        run: |
+          sudo git config --global --add safe.directory '*'
+
+      - name: Get Flutter dependencies
+        run: flutter pub get
 
       - name: Build Linux (debug)
         run: flutter build linux --debug --dart-define=PORTABLE=false
@@ -206,7 +210,9 @@ jobs:
           flutter-version: "3.x"
           channel: stable
           cache: true
-      - run: flutter pub get
+
+      - name: Get Flutter dependencies
+        run: flutter pub get
 
       - name: Build Windows (debug)
         run: flutter build windows --debug --dart-define=PORTABLE=false
@@ -244,7 +250,9 @@ jobs:
           flutter-version: "3.x"
           channel: stable
           cache: true
-      - run: flutter pub get
+
+      - name: Get Flutter dependencies
+        run: flutter pub get
 
       - name: Setup release signing
         env:

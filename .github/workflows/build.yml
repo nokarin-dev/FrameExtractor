@@ -398,6 +398,10 @@ jobs:
           channel: stable
           cache: true
 
+      - name: Configure Git safe directory
+        run: |
+          sudo git config --global --add safe.directory '*'
+
       - name: Download dummy binaries
         uses: actions/download-artifact@v4
         with:
