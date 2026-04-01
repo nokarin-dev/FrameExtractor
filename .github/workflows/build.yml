@@ -43,18 +43,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/download-artifact@v4
+      - name: Download binaries
+        uses: actions/download-artifact@v4
         with:
           name: binaries
           path: assets/binaries
 
-      - uses: subosito/flutter-action@v2
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
         with:
           flutter-version: "3.x"
           channel: stable
           cache: true
 
-      - run: flutter pub get
+      - name: Get Flutter dependencies
+        run: flutter pub get
 
       # Installer
       - name: Build Windows (installer)
@@ -175,18 +178,21 @@ jobs:
             dpkg-dev fakeroot \
             rpm rpmbuild
 
-      - uses: actions/download-artifact@v4
+      - name: Download dummy binaries
+        uses: actions/download-artifact@v4
         with:
           name: binaries
           path: assets/binaries
 
-      - uses: subosito/flutter-action@v2
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
         with:
           flutter-version: "3.x"
           channel: stable
           cache: true
 
-      - run: flutter pub get
+      - name: Get Flutter dependencies
+        run: flutter pub get
 
       # Release build
       - name: Build Linux release
@@ -277,6 +283,132 @@ jobs:
           mv "$PKG.deb" "FrameExtractor-linux-installer.deb"
           echo "✓ .deb built"
           dpkg-deb --info "FrameExtractor-linux-installer.deb"
+
+      # AppImage
+      - name: Build .AppImage
+        run: |
+          BUNDLE="build/linux/x64/release/bundle"
+
+          wget -q "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage" \
+            -O /tmp/appimagetool.AppImage
+          chmod +x /tmp/appimagetool.AppImage
+          cd /tmp && ./appimagetool.AppImage --appimage-extract > /dev/null 2>&1
+          APPIMAGETOOL="/tmp/squashfs-root/AppRun"
+          cd "$GITHUB_WORKSPACE"
+
+          mkdir -p AppDir/app
+          mkdir -p AppDir/usr/share/applications
+          mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
+
+          cp -r "$BUNDLE/." AppDir/app/
+          chmod +x AppDir/app/bin/ffmpeg AppDir/app/bin/yt-dlp
+
+          if [ -f "assets/icons/icon_256.png" ]; then
+            cp "assets/icons/icon_256.png" AppDir/usr/share/icons/hicolor/256x256/apps/frameextractor.png
+            cp "assets/icons/icon_64.png"  AppDir/frameextractor.png
+          else
+            printf 'PNG' > AppDir/frameextractor.png
+          fi
+
+          cat > AppDir/frameextractor.desktop << 'DESKTOP'
+          [Desktop Entry]
+          Version=1.0
+          Type=Application
+          Name=FrameExtractor
+          GenericName=Video Frame Extractor
+          Comment=Extract frames from video files using ffmpeg
+          Exec=frameextractor
+          Icon=frameextractor
+          Categories=Video;AudioVideo;FrameExtraction;FrameExtractor;
+          Terminal=false
+          DESKTOP
+
+          # AppRun
+          cat > AppDir/AppRun << 'APPRUN'
+          #!/bin/sh
+          APPDIR="$(dirname "$(readlink -f "$0")")"
+
+          export PATH="$APPDIR/app/bin:$PATH"
+          export LD_LIBRARY_PATH="$APPDIR/app/lib:$LD_LIBRARY_PATH"
+
+          EXE_NAME=$(find "$APPDIR/app" -maxdepth 1 -type f ! -name "*.so" ! -name "*.desktop" \
+            | xargs -I{} basename {} | head -1)
+
+          if [ -z "$EXE_NAME" ]; then
+            echo "FrameExtractor: could not find executable in $APPDIR/app/" >&2
+            exit 1
+          fi
+
+          cd "$APPDIR/app"
+          exec "./$EXE_NAME" "$@"
+          APPRUN
+          chmod +x AppDir/AppRun
+
+          ARCH=x86_64 "$APPIMAGETOOL" --no-appstream AppDir "FrameExtractor-linux.AppImage"
+          chmod +x "FrameExtractor-linux.AppImage"
+          echo "✓ AppImage built"
+
+      # Portable tarball
+      - name: Build Linux (portable)
+        run: flutter build linux --release --dart-define=PORTABLE=true
+
+      - name: Inject binaries (portable)
+        run: |
+          mkdir -p build/linux/x64/release/bundle/bin
+          cp assets/binaries/linux/ffmpeg build/linux/x64/release/bundle/bin/
+          cp assets/binaries/linux/yt-dlp  build/linux/x64/release/bundle/bin/
+          chmod +x build/linux/x64/release/bundle/bin/*
+
+      - name: Package portable (.tar.gz)
+        run: |
+          tar -czf FrameExtractor-linux-portable.tar.gz \
+            -C build/linux/x64/release/bundle .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-builds
+          path: |
+            FrameExtractor-linux-installer.deb
+            FrameExtractor-linux-installer.rpm
+            FrameExtractor-linux.AppImage
+            FrameExtractor-linux-portable.tar.gz
+
+  # Linux (Fedora)
+  build-linux-fedora:
+    name: Linux (Fedora)
+    needs: prepare-binaries
+    runs-on: ubuntu-latest
+    container:
+      image: fedora:latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          dnf groupinstall -y "Development Tools"
+          dnf install -y \
+            git clang cmake ninja-build pkg-config \
+            gtk3-devel xz-devel libstdc++-devel \
+            rpm-build desktop-file-utils hicolor-icon-theme
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.x"
+          channel: stable
+          cache: true
+
+      - name: Download dummy binaries
+        uses: actions/download-artifact@v4
+        with:
+          name: binaries
+          path: assets/binaries
+
+      - name: Get Flutter dependencies
+        run: flutter pub get
+
+      - name: Build Linux (release)
+        run: flutter build linux --release --dart-define=PORTABLE=false
 
       # rpm package
       - name: Build .rpm package
@@ -371,7 +503,6 @@ jobs:
           $(echo "$FILES" | sed 's|^/usr/bin/frameextractor|%attr(0755,root,root) /usr/bin/frameextractor|')
           SPEC
 
-          # Build the RPM (no source needed — BUILDROOT already staged)
           rpmbuild -bb \
             --define "_topdir $HOME/rpmbuild" \
             --define "_builddir $HOME/rpmbuild/BUILD" \
@@ -386,94 +517,10 @@ jobs:
           echo "✓ .rpm built: FrameExtractor-linux-installer.rpm"
           rpm -qip "FrameExtractor-linux-installer.rpm"
 
-      # AppImage
-      - name: Build .AppImage
-        run: |
-          BUNDLE="build/linux/x64/release/bundle"
-
-          wget -q "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage" \
-            -O /tmp/appimagetool.AppImage
-          chmod +x /tmp/appimagetool.AppImage
-          cd /tmp && ./appimagetool.AppImage --appimage-extract > /dev/null 2>&1
-          APPIMAGETOOL="/tmp/squashfs-root/AppRun"
-          cd "$GITHUB_WORKSPACE"
-
-          mkdir -p AppDir/app
-          mkdir -p AppDir/usr/share/applications
-          mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
-
-          cp -r "$BUNDLE/." AppDir/app/
-          chmod +x AppDir/app/bin/ffmpeg AppDir/app/bin/yt-dlp
-
-          if [ -f "assets/icons/icon_256.png" ]; then
-            cp "assets/icons/icon_256.png" AppDir/usr/share/icons/hicolor/256x256/apps/frameextractor.png
-            cp "assets/icons/icon_64.png"  AppDir/frameextractor.png
-          else
-            printf 'PNG' > AppDir/frameextractor.png
-          fi
-
-          cat > AppDir/frameextractor.desktop << 'DESKTOP'
-          [Desktop Entry]
-          Version=1.0
-          Type=Application
-          Name=FrameExtractor
-          GenericName=Video Frame Extractor
-          Comment=Extract frames from video files using ffmpeg
-          Exec=frameextractor
-          Icon=frameextractor
-          Categories=Video;AudioVideo;FrameExtraction;FrameExtractor;
-          Terminal=false
-          DESKTOP
-
-          # AppRun
-          cat > AppDir/AppRun << 'APPRUN'
-          #!/bin/sh
-          APPDIR="$(dirname "$(readlink -f "$0")")"
-
-          export PATH="$APPDIR/app/bin:$PATH"
-          export LD_LIBRARY_PATH="$APPDIR/app/lib:$LD_LIBRARY_PATH"
-
-          EXE_NAME=$(find "$APPDIR/app" -maxdepth 1 -type f ! -name "*.so" ! -name "*.desktop" \
-            | xargs -I{} basename {} | head -1)
-
-          if [ -z "$EXE_NAME" ]; then
-            echo "FrameExtractor: could not find executable in $APPDIR/app/" >&2
-            exit 1
-          fi
-
-          cd "$APPDIR/app"
-          exec "./$EXE_NAME" "$@"
-          APPRUN
-          chmod +x AppDir/AppRun
-
-          ARCH=x86_64 "$APPIMAGETOOL" --no-appstream AppDir "FrameExtractor-linux.AppImage"
-          chmod +x "FrameExtractor-linux.AppImage"
-          echo "✓ AppImage built"
-
-      # Portable tarball
-      - name: Build Linux (portable)
-        run: flutter build linux --release --dart-define=PORTABLE=true
-
-      - name: Inject binaries (portable)
-        run: |
-          mkdir -p build/linux/x64/release/bundle/bin
-          cp assets/binaries/linux/ffmpeg build/linux/x64/release/bundle/bin/
-          cp assets/binaries/linux/yt-dlp  build/linux/x64/release/bundle/bin/
-          chmod +x build/linux/x64/release/bundle/bin/*
-
-      - name: Package portable (.tar.gz)
-        run: |
-          tar -czf FrameExtractor-linux-portable.tar.gz \
-            -C build/linux/x64/release/bundle .
-
       - uses: actions/upload-artifact@v4
         with:
-          name: linux-builds
-          path: |
-            FrameExtractor-linux-installer.deb
-            FrameExtractor-linux-installer.rpm
-            FrameExtractor-linux.AppImage
-            FrameExtractor-linux-portable.tar.gz
+          name: linux-fedora-build
+          path: FrameExtractor-linux-installer.rpm
 
   # Android
   build-android:
@@ -483,23 +530,27 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/download-artifact@v4
+      - name: Download binaries
+        uses: actions/download-artifact@v4
         with:
           name: binaries
           path: assets/binaries
 
-      - uses: actions/setup-java@v4
+      - name: Set up Java
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
 
-      - uses: subosito/flutter-action@v2
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
         with:
           flutter-version: "3.x"
           channel: stable
           cache: true
 
-      - run: flutter pub get
+      - name: Get Flutter dependencies
+        run: flutter pub get
 
       - name: Setup release signing
         env:
@@ -513,6 +564,7 @@ jobs:
           keyAlias=${{ secrets.KEY_ALIAS }}
           storeFile=keystore.jks
           EOF
+          echo "SIGNING_CONFIGURED=true" >> $GITHUB_ENV
 
       - name: Build split APKs
         run: |
