@@ -2,7 +2,7 @@
 
 <div align="center">
 
-**A modern, cross-platform video frame extractor with a clean UI - powered by ffmpeg & yt-dlp.**
+**A modern, cross-platform video frame extractor with a clean UI built with Flutter, powered by ffmpeg and yt-dlp. Supports local video files and direct YouTube URL extraction.**
 
 [![Release](https://img.shields.io/github/v/release/nokarin-dev/frameextractor?style=for-the-badge&color=4F8EF7)](https://github.com/nokarin-dev/frameextractor/releases/latest)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg?style=for-the-badge)](LICENSE)
@@ -41,10 +41,11 @@ Head to the [**Releases**](https://github.com/nokarin-dev/frameextractor/release
 
 | Platform            | File                                    | Notes                                                       |
 |---------------------|-----------------------------------------|-------------------------------------------------------------|
-| 🪟 Windows          | `FrameExtractor-windows-installer.zip`  | Extract & run `.exe`                                        |
+| 🪟 Windows          | `FrameExtractor-windows-installer.zip`  | Installation for windows                                    |
 | 🪟 Windows Portable | `FrameExtractor-windows-portable.zip`   | No installation needed                                      |
-| 🐧 Linux            | `FrameExtractor-linux-installer.tar.gz` | Extract & run                                               |
-| 🐧 Linux Portable   | `FrameExtractor-linux-portable.tar.gz`  | Self-contained folder                                       |
+| 🐧 Linux Debian     | `FrameExtractor-linux-installer.deb`    | Installation for debian (Ubuntu, Linux mint, etc)           |
+| 🐧 Linux RPM        | `FrameExtractor-linux-installer.rpm`    | Installation for rpm (Fedora, RHEL, etc)                    |
+| 🐧 Linux Portable   | `FrameExtractor-linux-portable.tar.gz`  | No installation needed                                      |
 | 🤖 Android          | `FrameExtractor-android-arm32.apk`      | Enable "Install unknown apps" in settings (For older phone) |
 | 🤖 Android          | `FrameExtractor-android-arm64.apk`      | Enable "Install unknown apps" in settings                   |
 | 🤖 Android          | `FrameExtractor-android-x86_64.apk`     | Emulators / Chromebooks                                     |
@@ -88,7 +89,7 @@ flutter build linux --release --dart-define=PORTABLE=false # installer
 flutter build linux --release --dart-define=PORTABLE=true # portable
 flutter build windows --release --dart-define=PORTABLE=false
 flutter build windows --release --dart-define=PORTABLE=true
-flutter build apk --release # Android
+flutter build apk --release --split-per-abi # Android
 ```
 
 ---

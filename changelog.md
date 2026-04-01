@@ -10,9 +10,19 @@ This project loosely follows Keep a Changelog and uses Semantic Versioning.
 ### Added
 #### Core
 - Update checker
+- Included application icon to windows & android library
+- Added RPM Build
+
+### Fixed
+#### CI/CD
+- AppImage failed to launch
+- Application failed to start and crash on android platform
 
 ### Changed
-- New FrameExtractor Application Icon
+#### User Interface
+- FrameExtractor Application Icon
+- TitleBar & Splash Screen default material icon to FrameExtractor Icon
+- Log Body not expandable now on mobile
 
 ---
 ## [1.1.2] - 2026-03-26

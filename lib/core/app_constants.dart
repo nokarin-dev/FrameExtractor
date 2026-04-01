@@ -1,7 +1,7 @@
 class AppConstants {
   // App info
   static const String appName = 'Frame Extractor';
-  static const String appVersion = '1.1.2';
+  static const String appVersion = '1.1.3';
   static const String appDescription = 'Effortless video frame extraction';
 
   // Extraction defaults

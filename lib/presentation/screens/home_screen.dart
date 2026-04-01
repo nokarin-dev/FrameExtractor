@@ -246,8 +246,8 @@ class _HomeScreenState extends State<HomeScreen>
       ),
       child: Row(
         children: [
-          Icon(Icons.video_library_rounded, color: c.accent, size: 20),
-          const SizedBox(width: 10),
+          Image(image: AssetImage("assets/icons/icon_32.png"), width: 20, height: 20),
+          const SizedBox(width: 15),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -2044,7 +2044,7 @@ class _LogBody extends StatelessWidget {
     return SizedBox(
       height: _isDesktop ? 480 : null,
       child: DraggableScrollableSheet(
-        expand: true,
+        expand: _isDesktop ? true : false,
         initialChildSize: _isDesktop ? 1.0 : 0.55,
         maxChildSize: 1.0,
         minChildSize: _isDesktop ? 1.0 : 0.3,

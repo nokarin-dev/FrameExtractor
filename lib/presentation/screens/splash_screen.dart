@@ -113,12 +113,7 @@ class _SplashScreenState extends State<SplashScreen>
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    _SplashIcon(
-                      isDark: _isDark,
-                      isGlass: _isGlass,
-                      accent: _accent,
-                      accentDim: _accentDim,
-                    ),
+                    Image(image: AssetImage("assets/icons/icon_64.png")),
                     const SizedBox(height: 24),
 
                     Text(
@@ -177,69 +172,6 @@ class _SplashScreenState extends State<SplashScreen>
           ),
         ],
       ),
-    );
-  }
-}
-
-// Splash icon
-class _SplashIcon extends StatelessWidget {
-  final bool isDark;
-  final bool isGlass;
-  final Color accent;
-  final Color accentDim;
-
-  const _SplashIcon({
-    required this.isDark,
-    required this.isGlass,
-    required this.accent,
-    required this.accentDim,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    if (isGlass) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(22),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-          child: Container(
-            width: 72,
-            height: 72,
-            decoration: BoxDecoration(
-              color: accent.withValues(alpha: isDark ? 0.18 : 0.14),
-              borderRadius: BorderRadius.circular(22),
-              border: Border.all(
-                color: accent.withValues(alpha: isDark ? 0.35 : 0.40),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: accent.withValues(alpha: 0.20),
-                  blurRadius: 28,
-                  spreadRadius: 2,
-                ),
-              ],
-            ),
-            child: Icon(Icons.video_library_rounded, color: accent, size: 32),
-          ),
-        ),
-      );
-    }
-
-    return Container(
-      width: 72,
-      height: 72,
-      decoration: BoxDecoration(
-        color: accentDim,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: accent.withValues(alpha: 0.28),
-            blurRadius: 28,
-            spreadRadius: 3,
-          ),
-        ],
-      ),
-      child: Icon(Icons.video_library_rounded, color: accent, size: 32),
     );
   }
 }
