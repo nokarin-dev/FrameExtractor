@@ -92,7 +92,7 @@ jobs:
           AppPublisherURL=https://github.com/nokarin-dev/frameextractor
           AppSupportURL=https://github.com/nokarin-dev/frameextractor/issues
           DefaultDirName={localappdata}\FrameExtractor
-          DefaultGroupName=Frame Extractor
+          DefaultGroupName=FrameExtractor
           AllowNoIcons=yes
           OutputDir=.
           OutputBaseFilename=FrameExtractor-windows-installer
@@ -123,7 +123,7 @@ jobs:
           "@ | Out-File -FilePath "installer.iss" -Encoding UTF8
           Write-Host "Inno Setup script created for v$version"
 
-      - name: Compile installer (.exe)
+      - name: Compile installer
         shell: pwsh
         run: |
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "installer.iss"
@@ -132,13 +132,6 @@ jobs:
             exit 1
           }
           Write-Host "✓ Installer built: FrameExtractor-windows-installer.exe"
-
-      - name: Compile installer with Inno Setup
-        shell: pwsh
-        run: |
-          $inno = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
-          & $inno "installer.iss"
-          Write-Host "Installer compiled: FrameExtractor-windows-installer.exe"
 
       # Portable
       - name: Build Windows (portable)
@@ -165,7 +158,7 @@ jobs:
             FrameExtractor-windows-installer.exe
             FrameExtractor-windows-portable.zip
 
-  #.Linux
+  # Linux
   build-linux:
     name: Linux
     needs: prepare-binaries
@@ -179,7 +172,8 @@ jobs:
           sudo apt-get install -y \
             clang cmake ninja-build pkg-config \
             libgtk-3-dev liblzma-dev libstdc++-12-dev \
-            dpkg-dev fakeroot
+            dpkg-dev fakeroot \
+            rpm rpmbuild
 
       - uses: actions/download-artifact@v4
         with:
@@ -194,7 +188,7 @@ jobs:
 
       - run: flutter pub get
 
-      # Build
+      # Release build
       - name: Build Linux release
         run: flutter build linux --release --dart-define=PORTABLE=false
 
@@ -205,24 +199,22 @@ jobs:
           cp assets/binaries/linux/yt-dlp  build/linux/x64/release/bundle/bin/
           chmod +x build/linux/x64/release/bundle/bin/*
 
-      # deb package
       - name: Get version
         run: |
           echo "VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //;s/+.*//')" >> $GITHUB_ENV
 
+      # deb package
       - name: Build .deb package
         run: |
           PKG="frameextractor_${{ env.VERSION }}_amd64"
           BUNDLE="build/linux/x64/release/bundle"
 
-          # Create debian package structure
           mkdir -p "$PKG/DEBIAN"
           mkdir -p "$PKG/opt/frameextractor"
           mkdir -p "$PKG/usr/bin"
           mkdir -p "$PKG/usr/share/applications"
           mkdir -p "$PKG/usr/share/icons/hicolor/256x256/apps"
 
-          # Copy app bundle
           cp -r "$BUNDLE/." "$PKG/opt/frameextractor/"
 
           EXE=$(find "$PKG/opt/frameextractor" -maxdepth 1 -type f ! -name "*.so" ! -name "*.desktop" | head -1)
@@ -234,35 +226,30 @@ jobs:
 
           ln -s /opt/frameextractor/frameextractor "$PKG/usr/bin/frameextractor"
 
-          # Desktop entry
           cat > "$PKG/usr/share/applications/frameextractor.desktop" << 'DESKTOP'
           [Desktop Entry]
           Version=1.0
           Type=Application
-          Name=Frame Extractor
+          Name=FrameExtractor
           GenericName=Video Frame Extractor
           Comment=Extract frames from video files using ffmpeg
           Exec=/opt/frameextractor/frameextractor
           Icon=frameextractor
-          Categories=Video;AudioVideo;
+          Categories=Video;AudioVideo;FrameExtraction;FrameExtractor;
           Terminal=false
           StartupWMClass=frameextractor
           DESKTOP
 
-          # App icon
           if [ -f "assets/icons/icon_256.png" ]; then
             cp "assets/icons/icon_256.png" "$PKG/usr/share/icons/hicolor/256x256/apps/frameextractor.png"
           fi
 
-          # DEBIAN/control
           cat > "$PKG/DEBIAN/control" << EOF
           Package: frameextractor
           Version: ${{ env.VERSION }}
           Architecture: amd64
-          Maintainer: nokarin <noreply@github.com>
-          Description: Frame Extractor
-            Extract frames from local video files and YouTube using ffmpeg.
-            Supports PNG, JPG, WebP output with configurable FPS and quality.
+          Maintainer: nokarin <contact@nokarin.my.id>
+          Description: FrameExtractor is a modern, cross-platform video frame extractor with a clean UI built with Flutter, powered by ffmpeg and yt-dlp. Supports local video files and direct YouTube URL extraction.
           Depends: libgtk-3-0, libblkid1, liblzma5
           Section: video
           Priority: optional
@@ -279,7 +266,6 @@ jobs:
           POSTINST
           chmod 755 "$PKG/DEBIAN/postinst"
 
-          # post-remove script
           cat > "$PKG/DEBIAN/postrm" << 'POSTRM'
           #!/bin/sh
           update-desktop-database /usr/share/applications 2>/dev/null || true
@@ -287,13 +273,120 @@ jobs:
           POSTRM
           chmod 755 "$PKG/DEBIAN/postrm"
 
-          # Build the .deb
           fakeroot dpkg-deb --build "$PKG"
           mv "$PKG.deb" "FrameExtractor-linux-installer.deb"
-          echo "✓ .deb built: FrameExtractor-linux-installer.deb"
+          echo "✓ .deb built"
           dpkg-deb --info "FrameExtractor-linux-installer.deb"
 
-      # AppImage package
+      # rpm package
+      - name: Build .rpm package
+        run: |
+          VERSION="${{ env.VERSION }}"
+          BUNDLE="build/linux/x64/release/bundle"
+
+          mkdir -p ~/rpmbuild/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
+
+          BUILDROOT=~/rpmbuild/BUILDROOT/frameextractor-${VERSION}-1.x86_64
+          mkdir -p "$BUILDROOT/opt/frameextractor"
+          mkdir -p "$BUILDROOT/usr/bin"
+          mkdir -p "$BUILDROOT/usr/share/applications"
+          mkdir -p "$BUILDROOT/usr/share/icons/hicolor/256x256/apps"
+
+          cp -r "$BUNDLE/." "$BUILDROOT/opt/frameextractor/"
+
+          EXE=$(find "$BUILDROOT/opt/frameextractor" -maxdepth 1 -type f ! -name "*.so" ! -name "*.desktop" | head -1)
+          EXE_NAME=$(basename "$EXE")
+          if [ "$EXE_NAME" != "frameextractor" ]; then
+            mv "$EXE" "$BUILDROOT/opt/frameextractor/frameextractor"
+            echo "Renamed $EXE_NAME → frameextractor"
+          fi
+          chmod +x "$BUILDROOT/opt/frameextractor/frameextractor"
+          chmod +x "$BUILDROOT/opt/frameextractor/bin/ffmpeg" 2>/dev/null || true
+          chmod +x "$BUILDROOT/opt/frameextractor/bin/yt-dlp"  2>/dev/null || true
+
+          # Symlink
+          ln -s /opt/frameextractor/frameextractor "$BUILDROOT/usr/bin/frameextractor"
+
+          # Desktop entry
+          cat > "$BUILDROOT/usr/share/applications/frameextractor.desktop" << 'DESKTOP'
+          [Desktop Entry]
+          Version=1.0
+          Type=Application
+          Name=FrameExtractor
+          GenericName=Video Frame Extractor
+          Comment=Extract frames from video files using ffmpeg
+          Exec=/opt/frameextractor/frameextractor
+          Icon=frameextractor
+          Categories=Video;AudioVideo;
+          Terminal=false
+          StartupWMClass=frameextractor
+          DESKTOP
+
+          if [ -f "assets/icons/icon_256.png" ]; then
+            cp "assets/icons/icon_256.png" \
+              "$BUILDROOT/usr/share/icons/hicolor/256x256/apps/frameextractor.png"
+          fi
+
+          # Generate file list for %files section (everything under BUILDROOT)
+          FILES=$(find "$BUILDROOT" \( -type f -o -type l \) \
+            | sed "s|$BUILDROOT||" \
+            | sort)
+
+          # Write .spec
+          cat > ~/rpmbuild/SPECS/frameextractor.spec << SPEC
+          Name:           frameextractor
+          Version:        ${VERSION}
+          Release:        1%{?dist}
+          Summary:        FrameExtractor is a modern, cross-platform video frame extractor with a clean UI built with Flutter, powered by ffmpeg and yt-dlp. Supports local video files and direct YouTube URL extraction.
+          License:        MIT
+          URL:            https://github.com/nokarin-dev/frameextractor
+          BuildArch:      x86_64
+
+          Requires:       gtk3, xz-libs
+
+          %description
+          FrameExtractor is a modern, cross-platform video frame extractor
+          with a clean UI built with Flutter, powered by ffmpeg and yt-dlp.
+          Supports local video files and direct YouTube URL extraction.
+
+          %install
+          exit 0
+
+          %post
+          chmod +x /opt/frameextractor/frameextractor 2>/dev/null || true
+          chmod +x /opt/frameextractor/bin/ffmpeg      2>/dev/null || true
+          chmod +x /opt/frameextractor/bin/yt-dlp       2>/dev/null || true
+          update-desktop-database /usr/share/applications 2>/dev/null || true
+          /usr/bin/gtk-update-icon-cache \
+            /usr/share/icons/hicolor 2>/dev/null || true
+          exit 0
+
+          %postun
+          update-desktop-database /usr/share/applications 2>/dev/null || true
+          /usr/bin/gtk-update-icon-cache \
+            /usr/share/icons/hicolor 2>/dev/null || true
+          exit 0
+
+          %files
+          $(echo "$FILES" | sed 's|^/usr/bin/frameextractor|%attr(0755,root,root) /usr/bin/frameextractor|')
+          SPEC
+
+          # Build the RPM (no source needed — BUILDROOT already staged)
+          rpmbuild -bb \
+            --define "_topdir $HOME/rpmbuild" \
+            --define "_builddir $HOME/rpmbuild/BUILD" \
+            --define "__os_install_post %{nil}" \
+            ~/rpmbuild/SPECS/frameextractor.spec
+
+          RPM_FILE=$(find ~/rpmbuild/RPMS/x86_64 -name "*.rpm" | head -1)
+          if [ -z "$RPM_FILE" ]; then
+            echo "✗ RPM not found!" && exit 1
+          fi
+          cp "$RPM_FILE" "FrameExtractor-linux-installer.rpm"
+          echo "✓ .rpm built: FrameExtractor-linux-installer.rpm"
+          rpm -qip "FrameExtractor-linux-installer.rpm"
+
+      # AppImage
       - name: Build .AppImage
         run: |
           BUNDLE="build/linux/x64/release/bundle"
@@ -312,15 +405,9 @@ jobs:
           cp -r "$BUNDLE/." AppDir/app/
           chmod +x AppDir/app/bin/ffmpeg AppDir/app/bin/yt-dlp
 
-          # Detect executable name
-          EXE=$(find AppDir/app -maxdepth 1 -type f ! -name "*.so" ! -name "*.desktop" | head -1)
-          EXE_NAME=$(basename "$EXE")
-          echo "Detected executable: $EXE_NAME"
-
-          # App icon
           if [ -f "assets/icons/icon_256.png" ]; then
             cp "assets/icons/icon_256.png" AppDir/usr/share/icons/hicolor/256x256/apps/frameextractor.png
-            cp "assets/icons/icon_64.png" AppDir/frameextractor.png
+            cp "assets/icons/icon_64.png"  AppDir/frameextractor.png
           else
             printf 'PNG' > AppDir/frameextractor.png
           fi
@@ -329,39 +416,41 @@ jobs:
           [Desktop Entry]
           Version=1.0
           Type=Application
-          Name=Frame Extractor
+          Name=FrameExtractor
           GenericName=Video Frame Extractor
           Comment=Extract frames from video files using ffmpeg
           Exec=frameextractor
           Icon=frameextractor
-          Categories=Video;AudioVideo;
+          Categories=Video;AudioVideo;FrameExtraction;FrameExtractor;
           Terminal=false
           DESKTOP
 
+          # AppRun
           cat > AppDir/AppRun << 'APPRUN'
           #!/bin/sh
           APPDIR="$(dirname "$(readlink -f "$0")")"
 
           export PATH="$APPDIR/app/bin:$PATH"
-
           export LD_LIBRARY_PATH="$APPDIR/app/lib:$LD_LIBRARY_PATH"
 
-          EXE=$(find "$APPDIR/app" -maxdepth 1 -type f ! -name "*.so" | head -1)
-          if [ -z "$EXE" ]; then
+          EXE_NAME=$(find "$APPDIR/app" -maxdepth 1 -type f ! -name "*.so" ! -name "*.desktop" \
+            | xargs -I{} basename {} | head -1)
+
+          if [ -z "$EXE_NAME" ]; then
             echo "FrameExtractor: could not find executable in $APPDIR/app/" >&2
             exit 1
           fi
 
           cd "$APPDIR/app"
-          exec "./$EXE" "$@"
+          exec "./$EXE_NAME" "$@"
           APPRUN
           chmod +x AppDir/AppRun
 
           ARCH=x86_64 "$APPIMAGETOOL" --no-appstream AppDir "FrameExtractor-linux.AppImage"
           chmod +x "FrameExtractor-linux.AppImage"
-          echo "✓ AppImage built: FrameExtractor-linux.AppImage"
+          echo "✓ AppImage built"
 
-      # portable
+      # Portable tarball
       - name: Build Linux (portable)
         run: flutter build linux --release --dart-define=PORTABLE=true
 
@@ -382,10 +471,11 @@ jobs:
           name: linux-builds
           path: |
             FrameExtractor-linux-installer.deb
+            FrameExtractor-linux-installer.rpm
             FrameExtractor-linux.AppImage
             FrameExtractor-linux-portable.tar.gz
 
-  # Android APK
+  # Android
   build-android:
     name: Android
     needs: prepare-binaries
@@ -411,7 +501,6 @@ jobs:
 
       - run: flutter pub get
 
-      # Signing
       - name: Setup release signing
         env:
           KEYSTORE_B64: ${{ secrets.KEYSTORE_BASE64 }}
@@ -425,16 +514,15 @@ jobs:
           storeFile=keystore.jks
           EOF
 
-      # Build split APKs
       - name: Build split APKs
         run: |
           flutter build apk --release --dart-define=PORTABLE=false --split-per-abi
 
       - name: Rename APKs
         run: |
-          cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk FrameExtractor-android-arm64.apk
+          cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk   FrameExtractor-android-arm64.apk
           cp build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk FrameExtractor-android-arm32.apk
-          cp build/app/outputs/flutter-apk/app-x86_64-release.apk FrameExtractor-android-x86_64.apk
+          cp build/app/outputs/flutter-apk/app-x86_64-release.apk      FrameExtractor-android-x86_64.apk
 
       - uses: actions/upload-artifact@v4
         with:
@@ -444,7 +532,7 @@ jobs:
             FrameExtractor-android-arm32.apk
             FrameExtractor-android-x86_64.apk
 
-  # Release
+  # Create GitHub Release
   release:
     name: Create Release
     needs: [build-windows, build-linux, build-android]
@@ -496,11 +584,11 @@ jobs:
             <img width="1536" height="100" alt="Downloads" src="https://github.com/user-attachments/assets/fdc58dff-3ba3-4b2a-98aa-d2992f02c1c0" />
 
             ## Downloads
-            ### Windwos
-            [![Windows-Installer](https://img.shields.io/github/downloads/nokarin-dev/frameextractor/${{ github.ref_name }}/FrameExtractor-windows-installer.exe?displayAssetName=true&style=for-the-badge&logo=data%3Aimage%2Fpng%3Bbase64%2CiVBORw0KGgoAAAANSUhEUgAAAGQAAABkCAYAAABw4pVUAAAACXBIWXMAAAsTAAALEwEAmpwYAAAA40lEQVR4nO3RgQkAIRDAsNt%2FaX8HebBKMkGhMwAAADErbi7vNeQwQ2IMiTEkxpAYQ2IMiTEkxpAYQ2IMiTEkxpAYQ2IMiTEkxpAYQ2IMiTEkxpAYQ2IMiTEkxpAYQ2IMiTEkxpAYQ2IMiTEkxpAYQ2IMiTEkxpAYQ2IMeW0IAOxacXN5ryGHGRJjSIwhMYbEGBJjSIwhMYbEGBJjSIwhMYbEGBJjSIwhMYbEGBJjSIwhMYbEGBJjSIwhMYbEGBJjSIwhMYbEGBJjSIwhMYbEGBJjSIwhMYbEGBJjyGtDAAAA5l8fzPuhzmfqIykAAAAASUVORK5CYII%3D&label=%20&color=blue)](https://github.com/nokarin-dev/FrameExtractor/releases/download/${{ github.ref_name }}/FrameExtractor-windows-installer.exe) [![Windows-Portable](https://img.shields.io/github/downloads/nokarin-dev/frameextractor/${{ github.ref_name }}/FrameExtractor-windows-portable.zip?displayAssetName=true&style=for-the-badge&logo=data%3Aimage%2Fpng%3Bbase64%2CiVBORw0KGgoAAAANSUhEUgAAAGQAAABkCAYAAABw4pVUAAAACXBIWXMAAAsTAAALEwEAmpwYAAAA40lEQVR4nO3RgQkAIRDAsNt%2FaX8HebBKMkGhMwAAADErbi7vNeQwQ2IMiTEkxpAYQ2IMiTEkxpAYQ2IMiTEkxpAYQ2IMiTEkxpAYQ2IMiTEkxpAYQ2IMiTEkxpAYQ2IMiTEkxpAYQ2IMiTEkxpAYQ2IMiTEkxpAYQ2IMeW0IAOxacXN5ryGHGRJjSIwhMYbEGBJjSIwhMYbEGBJjSIwhMYbEGBJjSIwhMYbEGBJjSIwhMYbEGBJjSIwhMYbEGBJjSIwhMYbEGBJjSIwhMYbEGBJjSIwhMYbEGBJjyGtDAAAA5l8fzPuhzmfqIykAAAAASUVORK5CYII%3D&label=%20&color=blue) ](https://github.com/nokarin-dev/FrameExtractor/releases/download/${{ github.ref_name }}/FrameExtractor-windows-portable.zip)
+            ### Windows
+            [![Windows-Installer](https://img.shields.io/github/downloads/nokarin-dev/frameextractor/${{ github.ref_name }}/FrameExtractor-windows-installer.exe?displayAssetName=true&style=for-the-badge&logo=data%3Aimage%2Fpng%3Bbase64%2CiVBORw0KGgoAAAANSUhEUgAAAGQAAABkCAYAAABw4pVUAAAACXBIWXMAAAsTAAALEwEAmpwYAAAA40lEQVR4nO3RgQkAIRDAsNt%2FaX8HebBKMkGhMwAAADErbi7vNeQwQ2IMiTEkxpAYQ2IMiTEkxpAYQ2IMiTEkxpAYQ2IMiTEkxpAYQ2IMiTEkxpAYQ2IMiTEkxpAYQ2IMiTEkxpAYQ2IMiTEkxpAYQ2IMiTEkxpAYQ2IMeW0IAOxacXN5ryGHGRJjSIwhMYbEGBJjSIwhMYbEGBJjSIwhMYbEGBJjSIwhMYbEGBJjSIwhMYbEGBJjSIwhMYbEGBJjSIwhMYbEGBJjSIwhMYbEGBJjSIwhMYbEGBJjyGtDAAAA5l8fzPuhzmfqIykAAAAASUVORK5CYII%3D&label=%20&color=blue)](https://github.com/nokarin-dev/FrameExtractor/releases/download/${{ github.ref_name }}/FrameExtractor-windows-installer.exe) [![Windows-Portable](https://img.shields.io/github/downloads/nokarin-dev/frameextractor/${{ github.ref_name }}/FrameExtractor-windows-portable.zip?displayAssetName=true&style=for-the-badge&logo=data%3Aimage%2Fpng%3Bbase64%2CiVBORw0KGgoAAAANSUhEUgAAAGQAAABkCAYAAABw4pVUAAAACXBIWXMAAAsTAAALEwEAmpwYAAAA40lEQVR4nO3RgQkAIRDAsNt%2FaX8HebBKMkGhMwAAADErbi7vNeQwQ2IMiTEkxpAYQ2IMiTEkxpAYQ2IMiTEkxpAYQ2IMiTEkxpAYQ2IMiTEkxpAYQ2IMiTEkxpAYQ2IMiTEkxpAYQ2IMiTEkxpAYQ2IMiTEkxpAYQ2IMeW0IAOxacXN5ryGHGRJjSIwhMYbEGBJjSIwhMYbEGBJjSIwhMYbEGBJjSIwhMYbEGBJjSIwhMYbEGBJjSIwhMYbEGBJjSIwhMYbEGBJjSIwhMYbEGBJjSIwhMYbEGBJjyGtDAAAA5l8fzPuhzmfqIykAAAAASUVORK5CYII%3D&label=%20&color=blue)](https://github.com/nokarin-dev/FrameExtractor/releases/download/${{ github.ref_name }}/FrameExtractor-windows-portable.zip)
 
             ### Linux
-            [![Linux-Debian](https://img.shields.io/github/downloads/nokarin-dev/frameextractor/${{ github.ref_name }}/FrameExtractor-linux-installer.deb?displayAssetName=true&style=for-the-badge&logo=linux&logoColor=white&label=%20&color=e07334)](https://github.com/nokarin-dev/FrameExtractor/releases/download/${{ github.ref_name }}/FrameExtractor-linux-installer.deb) [![Linux-AppImage](https://img.shields.io/github/downloads/nokarin-dev/frameextractor/${{ github.ref_name }}/FrameExtractor-linux.AppImage?displayAssetName=true&style=for-the-badge&logo=linux&logoColor=white&label=%20&color=e07334)](https://github.com/nokarin-dev/FrameExtractor/releases/download/${{ github.ref_name }}/FrameExtractor-linux.AppImage) [![Linux-Portable](https://img.shields.io/github/downloads/nokarin-dev/frameextractor/${{ github.ref_name }}/FrameExtractor-linux-portable.tar.gz?displayAssetName=true&style=for-the-badge&logo=linux&logoColor=white&label=%20&color=e07334)](https://github.com/nokarin-dev/FrameExtractor/releases/download/${{ github.ref_name }}/FrameExtractor-linux-portable.tar.gz)
+            [![Linux-Debian](https://img.shields.io/github/downloads/nokarin-dev/frameextractor/${{ github.ref_name }}/FrameExtractor-linux-installer.deb?displayAssetName=true&style=for-the-badge&logo=linux&logoColor=white&label=%20&color=e07334)](https://github.com/nokarin-dev/FrameExtractor/releases/download/${{ github.ref_name }}/FrameExtractor-linux-installer.deb) [![Linux-RPM](https://img.shields.io/github/downloads/nokarin-dev/frameextractor/${{ github.ref_name }}/FrameExtractor-linux-installer.rpm?displayAssetName=true&style=for-the-badge&logo=linux&logoColor=white&label=%20&color=e07334)](https://github.com/nokarin-dev/FrameExtractor/releases/download/${{ github.ref_name }}/FrameExtractor-linux-installer.rpm) [![Linux-AppImage](https://img.shields.io/github/downloads/nokarin-dev/frameextractor/${{ github.ref_name }}/FrameExtractor-linux.AppImage?displayAssetName=true&style=for-the-badge&logo=linux&logoColor=white&label=%20&color=e07334)](https://github.com/nokarin-dev/FrameExtractor/releases/download/${{ github.ref_name }}/FrameExtractor-linux.AppImage) [![Linux-Portable](https://img.shields.io/github/downloads/nokarin-dev/frameextractor/${{ github.ref_name }}/FrameExtractor-linux-portable.tar.gz?displayAssetName=true&style=for-the-badge&logo=linux&logoColor=white&label=%20&color=e07334)](https://github.com/nokarin-dev/FrameExtractor/releases/download/${{ github.ref_name }}/FrameExtractor-linux-portable.tar.gz)
 
             ### Android
             [![Android-ARM64](https://img.shields.io/github/downloads/nokarin-dev/frameextractor/${{ github.ref_name }}/FrameExtractor-android-arm64.apk?displayAssetName=true&style=for-the-badge&logo=android&logoColor=white&label=%20&color=dark-green)](https://github.com/nokarin-dev/FrameExtractor/releases/download/${{ github.ref_name }}/FrameExtractor-android-arm64.apk) [![Android-ARM32](https://img.shields.io/github/downloads/nokarin-dev/frameextractor/${{ github.ref_name }}/FrameExtractor-android-arm32.apk?displayAssetName=true&style=for-the-badge&logo=android&logoColor=white&label=%20&color=dark-green)](https://github.com/nokarin-dev/FrameExtractor/releases/download/${{ github.ref_name }}/FrameExtractor-android-arm32.apk) [![Android-X86_64](https://img.shields.io/github/downloads/nokarin-dev/frameextractor/${{ github.ref_name }}/FrameExtractor-android-x86_64.apk?displayAssetName=true&style=for-the-badge&logo=android&logoColor=white&label=%20&color=dark-green)](https://github.com/nokarin-dev/FrameExtractor/releases/download/${{ github.ref_name }}/FrameExtractor-android-x86_64.apk)
@@ -510,6 +598,7 @@ jobs:
             dist/FrameExtractor-windows-installer.exe
             dist/FrameExtractor-windows-portable.zip
             dist/FrameExtractor-linux-installer.deb
+            dist/FrameExtractor-linux-installer.rpm
             dist/FrameExtractor-linux.AppImage
             dist/FrameExtractor-linux-portable.tar.gz
             dist/FrameExtractor-android-arm64.apk
