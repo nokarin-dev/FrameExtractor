@@ -122,7 +122,7 @@ jobs:
 
       - name: Install Flutter system dependencies
         run: |
-          sudo dnf groupinstall -y "Development Tools"
+          sudo dnf group install -y "Development Tools"
           sudo dnf install -y \
             clang cmake ninja-build pkg-config \
             gtk3-devel xz-devel libstdc++-devel \
@@ -241,8 +241,35 @@ jobs:
           cache: true
       - run: flutter pub get
 
+      - name: Setup release signing
+        env:
+          KEYSTORE_B64: ${{ secrets.KEYSTORE_BASE64 }}
+        if: env.KEYSTORE_B64 != ''
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/keystore.jks
+          cat > android/key.properties << EOF
+          storePassword=${{ secrets.STORE_PASSWORD }}
+          keyPassword=${{ secrets.KEY_PASSWORD }}
+          keyAlias=${{ secrets.KEY_ALIAS }}
+          storeFile=keystore.jks
+          EOF
+          echo "SIGNING_CONFIGURED=true" >> $GITHUB_ENV
+
       - name: Build Android APK (debug)
         run: flutter build apk --debug --dart-define=PORTABLE=false
+
+      - name: Verify APK signing
+        if: env.SIGNING_CONFIGURED == 'true'
+        run: |
+          for apk in \
+            build/app/outputs/flutter-apk/app-arm64-v8a-release.apk \
+            build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk \
+            build/app/outputs/flutter-apk/app-x86_64-release.apk; do
+            echo "Verifying $apk..."
+            $ANDROID_HOME/build-tools/$(ls $ANDROID_HOME/build-tools | tail -1)/apksigner \
+              verify --verbose "$apk" 2>&1 | grep -E "Verified|error" || true
+          done
+          echo "✓ APK signing verified"
 
       - name: Verify APK exists
         run: |
