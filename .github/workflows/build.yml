@@ -373,9 +373,9 @@ jobs:
             FrameExtractor-linux.AppImage
             FrameExtractor-linux-portable.tar.gz
 
-  # Linux (Fedora)
-  build-linux-fedora:
-    name: Linux (Fedora)
+  # Linux (RPM)
+  build-linux-rpm:
+    name: Linux (RPM)
     needs: prepare-binaries
     runs-on: ubuntu-latest
     container:
@@ -389,9 +389,9 @@ jobs:
         run: |
           sudo dnf install @development-tools -y
           sudo dnf install -y \
-            git clang cmake ninja-build pkg-config \
+            clang cmake ninja-build pkg-config \
             gtk3-devel xz-devel libstdc++-devel \
-            rpm-build desktop-file-utils hicolor-icon-theme jq
+            rpm-build desktop-file-utils hicolor-icon-theme jq which
 
       - name: Configure Git safe directory
         run: |
@@ -476,8 +476,8 @@ jobs:
           Name:           frameextractor
           Version:        ${VERSION}
           Release:        1%{?dist}
-          Summary:        FrameExtractor is a modern, cross-platform video frame extractor with a clean UI built with Flutter, powered by ffmpeg and yt-dlp. Supports local video files and direct YouTube URL extraction.
-          License:        MIT
+          Summary:        Effortless video frame extraction
+          License:        GPLv3
           URL:            https://github.com/nokarin-dev/frameextractor
           BuildArch:      x86_64
 

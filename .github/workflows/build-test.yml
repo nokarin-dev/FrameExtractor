@@ -66,8 +66,9 @@ jobs:
           path: assets/binaries
           retention-days: 1
 
-  test-linux-debian:
-    name: Build Test — Linux (Debian)
+  # Linux
+  test-linux:
+    name: Build Test — Linux
     needs: [analyze, prepare-dummy-binaries]
     runs-on: ubuntu-22.04
     steps:
@@ -113,8 +114,9 @@ jobs:
           rpmbuild --version
           echo "✓ rpmbuild available"
 
-  test-linux-fedora:
-    name: Build Test — Linux (Fedora)
+  # Linux (RPM)
+  test-linux-rpm:
+    name: Build Test — Linux (RPM)
     needs: [analyze, prepare-dummy-binaries]
     runs-on: ubuntu-latest
     container:
@@ -130,7 +132,7 @@ jobs:
           sudo dnf install -y \
             clang cmake ninja-build pkg-config \
             gtk3-devel xz-devel libstdc++-devel \
-            rpm-build jq
+            rpm-build jq which
 
       - name: Configure Git safe directory
         run: |
@@ -160,14 +162,16 @@ jobs:
         run: |
           mkdir -p rpmbuild/SPECS
           cat > rpmbuild/SPECS/frameextractor.spec << 'EOF'
-          Name:           frameextractor
-          Version:        1.0.0
-          Release:        1%{?dist}
-          Summary:        Frame Extractor Application
-          License:        GPL
+          Name: FrameExtractor
+          Version: 1.0.0
+          Release: 1%{?dist}
+          Summary: Effortless video frame extraction
+          License: GPLv3
 
           %description
-          A Flutter-based frame extraction tool.
+          FrameExtractor is a modern, cross-platform video frame extractor
+          with a clean UI built with Flutter, powered by ffmpeg and yt-dlp.
+          Supports local video files and direct YouTube URL extraction.
 
           %prep
 
@@ -179,10 +183,6 @@ jobs:
 
           %files
           /opt/frameextractor/*
-
-          %changelog
-          * Wed Apr 01 2026 Builder <build@example.com> - 1.0.0-1
-          - Initial release
           EOF
 
       - name: Build RPM package
@@ -195,6 +195,7 @@ jobs:
           rpmbuild --version
           echo "✓ RPM build OK"
 
+  # Windows
   test-windows:
     name: Build Test — Windows
     needs: [analyze, prepare-dummy-binaries]
@@ -230,6 +231,7 @@ jobs:
             Write-Error "✗ Not found: $exe"; exit 1
           }
 
+  # Android
   test-android:
     name: Build Test — Android
     needs: [analyze, prepare-dummy-binaries]
@@ -299,8 +301,8 @@ jobs:
     needs:
       [
         analyze,
-        test-linux-debian,
-        test-linux-fedora,
+        test-linux,
+        test-linux-rpm,
         test-windows,
         test-android,
       ]
@@ -310,14 +312,14 @@ jobs:
       - name: Check all jobs
         run: |
           echo "analyze:      ${{ needs.analyze.result }}"
-          echo "test-linux-debian:   ${{ needs.test-linux-debian.result }}"
-          echo "test-linux-fedora:   ${{ needs.test-linux-fedora.result }}"
+          echo "test-linux:   ${{ needs.test-linux.result }}"
+          echo "test-linux-rpm:   ${{ needs.test-linux-rpm.result }}"
           echo "test-windows: ${{ needs.test-windows.result }}"
           echo "test-android: ${{ needs.test-android.result }}"
           if [[ \
             "${{ needs.analyze.result }}"      == "success" && \
-            "${{ needs.test-linux-debian.result }}"   == "success" && \
-            "${{ needs.test-linux-fedora.result }}"   == "success" && \
+            "${{ needs.test-linux.result }}"   == "success" && \
+            "${{ needs.test-linux-rpm.result }}"   == "success" && \
             "${{ needs.test-windows.result }}" == "success" && \
             "${{ needs.test-android.result }}" == "success" \
           ]]; then
