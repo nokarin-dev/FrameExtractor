@@ -161,8 +161,8 @@ jobs:
         run: |
           BUNDLE_DIR="$GITHUB_WORKSPACE/build/linux/x64/debug/bundle"
 
-          mkdir -p rpmbuild/SPECS
-          cat > rpmbuild/SPECS/frameextractor.spec << 'EOF'
+          mkdir -p $GITHUB_WORKSPACE/rpmbuild/SPECS
+          cat > $GITHUB_WORKSPACE/rpmbuild/SPECS/frameextractor.spec << 'EOF'
           Name:       FrameExtractor
           Version:    1.0.0
           Release:    1%{?dist}
@@ -189,12 +189,12 @@ jobs:
       - name: Build RPM package
         run: |
           rpmbuild -bb \
-            --define "_topdir $HOME/rpmbuild" \
-            ~/rpmbuild/SPECS/frameextractor.spec
+            --define "_topdir $GITHUB_WORKSPACE/rpmbuild" \
+            $GITHUB_WORKSPACE/rpmbuild/SPECS/frameextractor.spec
 
       - name: Verify RPM created
         run: |
-          ls -la rpmbuild/RPMS/*/frameextractor-*.rpm
+          ls -la $GITHUB_WORKSPACE/rpmbuild/RPMS/*/frameextractor-*.rpm
           rpmbuild --version
           echo "✓ RPM build OK"
 

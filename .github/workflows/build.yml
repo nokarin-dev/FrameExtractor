@@ -432,10 +432,11 @@ jobs:
         run: |
           VERSION="${{ env.VERSION }}"
           BUNDLE="$GITHUB_WORKSPACE/build/linux/x64/release/bundle"
+          RPMROOT="$GITHUB_WORKSPACE/rpmbuild"          # ← pakai GITHUB_WORKSPACE, bukan HOME
 
-          mkdir -p ~/rpmbuild/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
+          mkdir -p "$RPMROOT"/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
 
-          BUILDROOT=~/rpmbuild/BUILDROOT/frameextractor-${VERSION}-1.x86_64
+          BUILDROOT="$RPMROOT/BUILDROOT/frameextractor-${VERSION}-1.x86_64"
           mkdir -p "$BUILDROOT/opt/frameextractor"
           mkdir -p "$BUILDROOT/usr/bin"
           mkdir -p "$BUILDROOT/usr/share/applications"
@@ -459,13 +460,10 @@ jobs:
           Version=1.0
           Type=Application
           Name=FrameExtractor
-          GenericName=Video Frame Extractor
-          Comment=Extract frames from video files using ffmpeg
           Exec=/opt/frameextractor/frameextractor
           Icon=frameextractor
-          Categories=Video;AudioVideo;FrameExtraction;FrameExtractor;
+          Categories=Video;AudioVideo;
           Terminal=false
-          StartupWMClass=frameextractor
           DESKTOP
 
           if [ -f "$GITHUB_WORKSPACE/assets/icons/icon_256.png" ]; then
@@ -474,10 +472,9 @@ jobs:
           fi
 
           FILES=$(find "$BUILDROOT" \( -type f -o -type l \) \
-            | sed "s|$BUILDROOT||" \
-            | sort)
+            | sed "s|$BUILDROOT||" | sort)
 
-          cat > ~/rpmbuild/SPECS/frameextractor.spec << SPEC
+          cat > "$RPMROOT/SPECS/frameextractor.spec" << SPEC
           Name:           frameextractor
           Version:        ${VERSION}
           Release:        1%{?dist}
@@ -499,12 +496,10 @@ jobs:
           chmod +x /opt/frameextractor/bin/ffmpeg 2>/dev/null || true
           chmod +x /opt/frameextractor/bin/yt-dlp 2>/dev/null || true
           update-desktop-database /usr/share/applications 2>/dev/null || true
-          /usr/bin/gtk-update-icon-cache /usr/share/icons/hicolor 2>/dev/null || true
           exit 0
 
           %postun
           update-desktop-database /usr/share/applications 2>/dev/null || true
-          /usr/bin/gtk-update-icon-cache /usr/share/icons/hicolor 2>/dev/null || true
           exit 0
 
           %changelog
@@ -515,13 +510,17 @@ jobs:
           $(echo "$FILES" | sed 's|^/usr/bin/frameextractor|%attr(0755,root,root) /usr/bin/frameextractor|')
           SPEC
 
-          rpmbuild -bb \
-            --define "_topdir $HOME/rpmbuild" \
-            --define "_builddir $HOME/rpmbuild/BUILD" \
-            --define "__os_install_post %{nil}" \
-            ~/rpmbuild/SPECS/frameextractor.spec
+          # Verify spec was created
+          ls -la "$RPMROOT/SPECS/"
+          cat "$RPMROOT/SPECS/frameextractor.spec"
 
-          RPM_FILE=$(find ~/rpmbuild/RPMS/x86_64 -name "*.rpm" | head -1)
+          rpmbuild -bb \
+            --define "_topdir $RPMROOT" \
+            --define "_builddir $RPMROOT/BUILD" \
+            --define "__os_install_post %{nil}" \
+            "$RPMROOT/SPECS/frameextractor.spec"
+
+          RPM_FILE=$(find "$RPMROOT/RPMS/x86_64" -name "*.rpm" | head -1)
           [ -z "$RPM_FILE" ] && echo "✗ RPM not found!" && exit 1
           cp "$RPM_FILE" "$GITHUB_WORKSPACE/FrameExtractor-linux-installer.rpm"
           echo "✓ RPM built"
