@@ -431,31 +431,16 @@ jobs:
       - name: Build .rpm package
         run: |
           VERSION="${{ env.VERSION }}"
-          BUNDLE="$GITHUB_WORKSPACE/build/linux/x64/release/bundle"
-          RPMROOT="$GITHUB_WORKSPACE/rpmbuild"          # ← pakai GITHUB_WORKSPACE, bukan HOME
+          BUNDLE_DIR="$GITHUB_WORKSPACE/build/linux/x64/release/bundle"
+          RPMROOT="$GITHUB_WORKSPACE/rpmbuild"
 
           mkdir -p "$RPMROOT"/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
 
-          BUILDROOT="$RPMROOT/BUILDROOT/frameextractor-${VERSION}-1.x86_64"
-          mkdir -p "$BUILDROOT/opt/frameextractor"
-          mkdir -p "$BUILDROOT/usr/bin"
-          mkdir -p "$BUILDROOT/usr/share/applications"
-          mkdir -p "$BUILDROOT/usr/share/icons/hicolor/256x256/apps"
+          echo "$BUNDLE_DIR" > "$RPMROOT/SOURCES/bundle_path.txt"
 
-          cp -r "$BUNDLE/." "$BUILDROOT/opt/frameextractor/"
-
-          EXE=$(find "$BUILDROOT/opt/frameextractor" -maxdepth 1 -type f ! -name "*.so" ! -name "*.desktop" | head -1)
-          EXE_NAME=$(basename "$EXE")
-          if [ "$EXE_NAME" != "frameextractor" ]; then
-            mv "$EXE" "$BUILDROOT/opt/frameextractor/frameextractor"
-          fi
-          chmod +x "$BUILDROOT/opt/frameextractor/frameextractor"
-          chmod +x "$BUILDROOT/opt/frameextractor/bin/ffmpeg" 2>/dev/null || true
-          chmod +x "$BUILDROOT/opt/frameextractor/bin/yt-dlp" 2>/dev/null || true
-
-          ln -s /opt/frameextractor/frameextractor "$BUILDROOT/usr/bin/frameextractor"
-
-          cat > "$BUILDROOT/usr/share/applications/frameextractor.desktop" << 'DESKTOP'
+          # Desktop entry
+          mkdir -p "$RPMROOT/SOURCES"
+          cat > "$RPMROOT/SOURCES/frameextractor.desktop" << 'DESKTOP'
           [Desktop Entry]
           Version=1.0
           Type=Application
@@ -464,25 +449,13 @@ jobs:
           Icon=frameextractor
           Categories=Video;AudioVideo;FrameExtraction;FrameExtractor;
           Terminal=false
+          StartupWMClass=frameextractor
           DESKTOP
 
           if [ -f "$GITHUB_WORKSPACE/assets/icons/icon_256.png" ]; then
             cp "$GITHUB_WORKSPACE/assets/icons/icon_256.png" \
-              "$BUILDROOT/usr/share/icons/hicolor/256x256/apps/frameextractor.png"
+              "$RPMROOT/SOURCES/frameextractor.png"
           fi
-
-          FILES=$(find "$BUILDROOT" \( -type f -o -type l \) \
-            | sed "s|$BUILDROOT||" | sort)
-
-          cat > "$RPMROOT/SPECS/frameextractor.spec" << SPEC
-          Name:           frameextractor
-          Version:        ${VERSION}
-          Release:        1%{?dist}
-          Summary:        Effortless video frame extraction
-          License:        GPLv3
-          URL:            https://github.com/nokarin-dev/frameextractor
-          BuildArch:      x86_64
-          Requires:       gtk3, xz-libs
 
           %description
           FrameExtractor is a modern, cross-platform video frame extractor
@@ -490,24 +463,53 @@ jobs:
           Supports local video files and direct YouTube URL extraction.
 
           %install
-          exit 0
+          BUNDLE=\$(cat $RPMROOT/SOURCES/bundle_path.txt)
+          mkdir -p %{buildroot}/opt/frameextractor
+          mkdir -p %{buildroot}/usr/bin
+          mkdir -p %{buildroot}/usr/share/applications
+          mkdir -p %{buildroot}/usr/share/icons/hicolor/256x256/apps
+
+          cp -r \$BUNDLE/. %{buildroot}/opt/frameextractor/
+
+          EXE=\$(find %{buildroot}/opt/frameextractor -maxdepth 1 -type f ! -name "*.so" ! -name "*.desktop" | head -1)
+          EXE_NAME=\$(basename \$EXE)
+          if [ "\$EXE_NAME" != "frameextractor" ]; then
+            mv "\$EXE" %{buildroot}/opt/frameextractor/frameextractor
+          fi
+          chmod +x %{buildroot}/opt/frameextractor/frameextractor
+          chmod +x %{buildroot}/opt/frameextractor/bin/ffmpeg 2>/dev/null || true
+          chmod +x %{buildroot}/opt/frameextractor/bin/yt-dlp 2>/dev/null || true
+
+          ln -s /opt/frameextractor/frameextractor %{buildroot}/usr/bin/frameextractor
+
+          cp $RPMROOT/SOURCES/frameextractor.desktop \
+            %{buildroot}/usr/share/applications/frameextractor.desktop
+
+          if [ -f "$RPMROOT/SOURCES/frameextractor.png" ]; then
+            cp $RPMROOT/SOURCES/frameextractor.png \
+              %{buildroot}/usr/share/icons/hicolor/256x256/apps/frameextractor.png
+          fi
 
           %post
           chmod +x /opt/frameextractor/frameextractor 2>/dev/null || true
           chmod +x /opt/frameextractor/bin/ffmpeg 2>/dev/null || true
           chmod +x /opt/frameextractor/bin/yt-dlp 2>/dev/null || true
           update-desktop-database /usr/share/applications 2>/dev/null || true
+          /usr/bin/gtk-update-icon-cache /usr/share/icons/hicolor 2>/dev/null || true
           exit 0
 
           %postun
           update-desktop-database /usr/share/applications 2>/dev/null || true
+          /usr/bin/gtk-update-icon-cache /usr/share/icons/hicolor 2>/dev/null || true
           exit 0
 
           %files
-          $(echo "$FILES" | sed 's|^/usr/bin/frameextractor|%attr(0755,root,root) /usr/bin/frameextractor|')
+          %attr(0755, root, root) /usr/bin/frameextractor
+          /opt/frameextractor/*
+          /usr/share/applications/frameextractor.desktop
+          /usr/share/icons/hicolor/256x256/apps/frameextractor.png
           SPEC
 
-          ls -la "$RPMROOT/SPECS/"
           cat "$RPMROOT/SPECS/frameextractor.spec"
 
           rpmbuild -bb \
@@ -519,7 +521,8 @@ jobs:
           RPM_FILE=$(find "$RPMROOT/RPMS/x86_64" -name "*.rpm" | head -1)
           [ -z "$RPM_FILE" ] && echo "✗ RPM not found!" && exit 1
           cp "$RPM_FILE" "$GITHUB_WORKSPACE/FrameExtractor-linux-installer.rpm"
-          echo "✓ RPM built"
+          echo "✓ RPM built: FrameExtractor-linux-installer.rpm"
+          rpm -qip "$GITHUB_WORKSPACE/FrameExtractor-linux-installer.rpm"
 
       - uses: actions/upload-artifact@v4
         with:
