@@ -7,6 +7,11 @@ This project loosely follows Keep a Changelog and uses Semantic Versioning.
 ---
 
 ## [Unreleased]
+
+No Changes Yet.
+
+---
+## [1.1.3] - 2026-04-02
 ### Added
 #### Core
 - Update checker
@@ -24,7 +29,6 @@ This project loosely follows Keep a Changelog and uses Semantic Versioning.
 - TitleBar & Splash Screen default material icon to FrameExtractor Icon
 - Log Body not expandable now on mobile
 
----
 ## [1.1.2] - 2026-03-26
 ### Fixed
 #### CI/CD
@@ -163,7 +167,8 @@ On first launch, required binaries are extracted to:
 
 ---
 
-[Unreleased]: https://github.com/nokarin-dev/frameextractor/compare/v1.1.2...HEAD
+[Unreleased]: https://github.com/nokarin-dev/frameextractor/compare/v1.1.3...HEAD
+[1.1.3]: https://github.com/nokarin-dev/frameextractor/releases/tag/v1.1.3
 [1.1.2]: https://github.com/nokarin-dev/frameextractor/releases/tag/v1.1.2
 [1.1.1]: https://github.com/nokarin-dev/frameextractor/releases/tag/v1.1.1
 [1.1.0]: https://github.com/nokarin-dev/frameextractor/releases/tag/v1.1.0

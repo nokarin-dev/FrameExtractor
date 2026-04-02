@@ -128,8 +128,7 @@ jobs:
 
       - name: Install build dependencies
         run: |
-          sudo dnf install @development-tools -y
-          sudo dnf install -y \
+          sudo dnf install -y @development-tools \
             clang cmake ninja-build pkg-config \
             gtk3-devel xz-devel libstdc++-devel \
             rpm-build jq which
@@ -160,13 +159,15 @@ jobs:
 
       - name: Create RPM spec file
         run: |
+          BUNDLE_DIR="$GITHUB_WORKSPACE/build/linux/x64/debug/bundle"
+
           mkdir -p rpmbuild/SPECS
           cat > rpmbuild/SPECS/frameextractor.spec << 'EOF'
-          Name: FrameExtractor
-          Version: 1.0.0
-          Release: 1%{?dist}
-          Summary: Effortless video frame extraction
-          License: GPLv3
+          Name:       FrameExtractor
+          Version:    1.0.0
+          Release:    1%{?dist}
+          Summary:    Effortless video frame extraction
+          License:    GPLv3
 
           %description
           FrameExtractor is a modern, cross-platform video frame extractor
@@ -179,7 +180,7 @@ jobs:
 
           %install
           mkdir -p %{buildroot}/opt/frameextractor
-          cp -r build/linux/x64/debug/bundle/* %{buildroot}/opt/frameextractor/
+          cp -r ${BUNDLE_DIR}/. %{buildroot}/opt/frameextractor/
 
           %files
           /opt/frameextractor/*
@@ -187,7 +188,9 @@ jobs:
 
       - name: Build RPM package
         run: |
-          rpmbuild -bb rpmbuild/SPECS/frameextractor.spec
+          rpmbuild -bb \
+            --define "_topdir $HOME/rpmbuild" \
+            ~/rpmbuild/SPECS/frameextractor.spec
 
       - name: Verify RPM created
         run: |
@@ -298,14 +301,7 @@ jobs:
 
   all-tests-pass:
     name: All build tests passed
-    needs:
-      [
-        analyze,
-        test-linux,
-        test-linux-rpm,
-        test-windows,
-        test-android,
-      ]
+    needs: [analyze, test-linux, test-linux-rpm, test-windows, test-android]
     runs-on: ubuntu-latest
     if: always()
     steps:

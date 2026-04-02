@@ -387,8 +387,7 @@ jobs:
 
       - name: Install build dependencies
         run: |
-          sudo dnf install @development-tools -y
-          sudo dnf install -y \
+          sudo dnf install -y @development-tools \
             clang cmake ninja-build pkg-config \
             gtk3-devel xz-devel libstdc++-devel \
             rpm-build desktop-file-utils hicolor-icon-theme jq which
@@ -405,7 +404,7 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Download dummy binaries
+      - name: Download binaries
         uses: actions/download-artifact@v4
         with:
           name: binaries
@@ -414,14 +413,25 @@ jobs:
       - name: Get Flutter dependencies
         run: flutter pub get
 
+      - name: Get version
+        run: |
+          echo "VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //;s/+.*//')" >> $GITHUB_ENV
+
       - name: Build Linux (release)
         run: flutter build linux --release --dart-define=PORTABLE=false
+
+      - name: Inject binaries
+        run: |
+          mkdir -p build/linux/x64/release/bundle/bin
+          cp assets/binaries/linux/ffmpeg build/linux/x64/release/bundle/bin/
+          cp assets/binaries/linux/yt-dlp  build/linux/x64/release/bundle/bin/
+          chmod +x build/linux/x64/release/bundle/bin/*
 
       # rpm package
       - name: Build .rpm package
         run: |
           VERSION="${{ env.VERSION }}"
-          BUNDLE="build/linux/x64/release/bundle"
+          BUNDLE="$GITHUB_WORKSPACE/build/linux/x64/release/bundle"
 
           mkdir -p ~/rpmbuild/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
 
@@ -437,16 +447,13 @@ jobs:
           EXE_NAME=$(basename "$EXE")
           if [ "$EXE_NAME" != "frameextractor" ]; then
             mv "$EXE" "$BUILDROOT/opt/frameextractor/frameextractor"
-            echo "Renamed $EXE_NAME → frameextractor"
           fi
           chmod +x "$BUILDROOT/opt/frameextractor/frameextractor"
           chmod +x "$BUILDROOT/opt/frameextractor/bin/ffmpeg" 2>/dev/null || true
-          chmod +x "$BUILDROOT/opt/frameextractor/bin/yt-dlp"  2>/dev/null || true
+          chmod +x "$BUILDROOT/opt/frameextractor/bin/yt-dlp" 2>/dev/null || true
 
-          # Symlink
           ln -s /opt/frameextractor/frameextractor "$BUILDROOT/usr/bin/frameextractor"
 
-          # Desktop entry
           cat > "$BUILDROOT/usr/share/applications/frameextractor.desktop" << 'DESKTOP'
           [Desktop Entry]
           Version=1.0
@@ -456,22 +463,20 @@ jobs:
           Comment=Extract frames from video files using ffmpeg
           Exec=/opt/frameextractor/frameextractor
           Icon=frameextractor
-          Categories=Video;AudioVideo;
+          Categories=Video;AudioVideo;FrameExtraction;FrameExtractor;
           Terminal=false
           StartupWMClass=frameextractor
           DESKTOP
 
-          if [ -f "assets/icons/icon_256.png" ]; then
-            cp "assets/icons/icon_256.png" \
+          if [ -f "$GITHUB_WORKSPACE/assets/icons/icon_256.png" ]; then
+            cp "$GITHUB_WORKSPACE/assets/icons/icon_256.png" \
               "$BUILDROOT/usr/share/icons/hicolor/256x256/apps/frameextractor.png"
           fi
 
-          # Generate file list for %files section (everything under BUILDROOT)
           FILES=$(find "$BUILDROOT" \( -type f -o -type l \) \
             | sed "s|$BUILDROOT||" \
             | sort)
 
-          # Write .spec
           cat > ~/rpmbuild/SPECS/frameextractor.spec << SPEC
           Name:           frameextractor
           Version:        ${VERSION}
@@ -480,31 +485,31 @@ jobs:
           License:        GPLv3
           URL:            https://github.com/nokarin-dev/frameextractor
           BuildArch:      x86_64
-
           Requires:       gtk3, xz-libs
 
           %description
           FrameExtractor is a modern, cross-platform video frame extractor
           with a clean UI built with Flutter, powered by ffmpeg and yt-dlp.
-          Supports local video files and direct YouTube URL extraction.
 
           %install
           exit 0
 
           %post
           chmod +x /opt/frameextractor/frameextractor 2>/dev/null || true
-          chmod +x /opt/frameextractor/bin/ffmpeg      2>/dev/null || true
-          chmod +x /opt/frameextractor/bin/yt-dlp       2>/dev/null || true
+          chmod +x /opt/frameextractor/bin/ffmpeg 2>/dev/null || true
+          chmod +x /opt/frameextractor/bin/yt-dlp 2>/dev/null || true
           update-desktop-database /usr/share/applications 2>/dev/null || true
-          /usr/bin/gtk-update-icon-cache \
-            /usr/share/icons/hicolor 2>/dev/null || true
+          /usr/bin/gtk-update-icon-cache /usr/share/icons/hicolor 2>/dev/null || true
           exit 0
 
           %postun
           update-desktop-database /usr/share/applications 2>/dev/null || true
-          /usr/bin/gtk-update-icon-cache \
-            /usr/share/icons/hicolor 2>/dev/null || true
+          /usr/bin/gtk-update-icon-cache /usr/share/icons/hicolor 2>/dev/null || true
           exit 0
+
+          %changelog
+          * $(date "+%a %b %d %Y") Builder <build@nokarin.my.id> - ${VERSION}-1
+          - Release ${VERSION}
 
           %files
           $(echo "$FILES" | sed 's|^/usr/bin/frameextractor|%attr(0755,root,root) /usr/bin/frameextractor|')
@@ -517,16 +522,13 @@ jobs:
             ~/rpmbuild/SPECS/frameextractor.spec
 
           RPM_FILE=$(find ~/rpmbuild/RPMS/x86_64 -name "*.rpm" | head -1)
-          if [ -z "$RPM_FILE" ]; then
-            echo "✗ RPM not found!" && exit 1
-          fi
-          cp "$RPM_FILE" "FrameExtractor-linux-installer.rpm"
-          echo "✓ .rpm built: FrameExtractor-linux-installer.rpm"
-          rpm -qip "FrameExtractor-linux-installer.rpm"
+          [ -z "$RPM_FILE" ] && echo "✗ RPM not found!" && exit 1
+          cp "$RPM_FILE" "$GITHUB_WORKSPACE/FrameExtractor-linux-installer.rpm"
+          echo "✓ RPM built"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: linux-fedora-build
+          name: linux-rpm-build
           path: FrameExtractor-linux-installer.rpm
 
   # Android
@@ -607,7 +609,7 @@ jobs:
   # Create GitHub Release
   release:
     name: Create Release
-    needs: [build-windows, build-linux, build-android]
+    needs: [build-windows, build-linux, build-linux-rpm, build-android]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
