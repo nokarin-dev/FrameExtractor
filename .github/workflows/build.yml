@@ -318,7 +318,7 @@ jobs:
           Comment=Extract frames from video files using ffmpeg
           Exec=frameextractor
           Icon=frameextractor
-          Categories=Video;AudioVideo;FrameExtraction;FrameExtractor;
+          Categories=Video;AudioVideo;Development;Utility;
           Terminal=false
           DESKTOP
 
@@ -445,7 +445,7 @@ jobs:
           Name=FrameExtractor
           Exec=/opt/frameextractor/frameextractor
           Icon=frameextractor
-          Categories=Video;AudioVideo;FrameExtraction;FrameExtractor;
+          Categories=Video;AudioVideo;Development;Utility;
           Terminal=false
           StartupWMClass=frameextractor
           DESKTOP
