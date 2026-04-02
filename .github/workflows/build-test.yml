@@ -164,19 +164,13 @@ jobs:
 
           mkdir -p "$RPMROOT"/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
 
-          # Prep BUILDROOT manual — jangan lewat %install
-          BUILDROOT="$RPMROOT/BUILDROOT/frameextractor-1.0.0-1.x86_64"
-          mkdir -p "$BUILDROOT/opt/frameextractor"
-          cp -r "$BUNDLE_DIR/." "$BUILDROOT/opt/frameextractor/"
-
-          # Generate file list
-          FILES=$(find "$BUILDROOT" -type f | sed "s|$BUILDROOT||" | sort)
+          echo "$BUNDLE_DIR" > "$RPMROOT/SOURCES/bundle_path.txt"
 
           cat > "$RPMROOT/SPECS/frameextractor.spec" << SPEC
-          Name:           frameextractor
+          Name:           FrameExtractor
           Version:        1.0.0
           Release:        1%{?dist}
-          Summary:        Frame Extractor Application
+          Summary:        Effortless video frame extraction
           License:        GPLv3
           BuildArch:      x86_64
 
@@ -186,10 +180,12 @@ jobs:
           Supports local video files and direct YouTube URL extraction.
 
           %install
-          exit 0
+          BUNDLE=\$(cat $RPMROOT/SOURCES/bundle_path.txt)
+          mkdir -p %{buildroot}/opt/frameextractor
+          cp -r \$BUNDLE/. %{buildroot}/opt/frameextractor/
 
           %files
-          $FILES
+          /opt/frameextractor/*
           SPEC
 
           rpmbuild -bb \
