@@ -462,7 +462,7 @@ jobs:
           Name=FrameExtractor
           Exec=/opt/frameextractor/frameextractor
           Icon=frameextractor
-          Categories=Video;AudioVideo;
+          Categories=Video;AudioVideo;FrameExtraction;FrameExtractor;
           Terminal=false
           DESKTOP
 
@@ -487,6 +487,7 @@ jobs:
           %description
           FrameExtractor is a modern, cross-platform video frame extractor
           with a clean UI built with Flutter, powered by ffmpeg and yt-dlp.
+          Supports local video files and direct YouTube URL extraction.
 
           %install
           exit 0
@@ -502,15 +503,10 @@ jobs:
           update-desktop-database /usr/share/applications 2>/dev/null || true
           exit 0
 
-          %changelog
-          * $(date "+%a %b %d %Y") Builder <build@nokarin.my.id> - ${VERSION}-1
-          - Release ${VERSION}
-
           %files
           $(echo "$FILES" | sed 's|^/usr/bin/frameextractor|%attr(0755,root,root) /usr/bin/frameextractor|')
           SPEC
 
-          # Verify spec was created
           ls -la "$RPMROOT/SPECS/"
           cat "$RPMROOT/SPECS/frameextractor.spec"
 

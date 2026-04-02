@@ -160,43 +160,49 @@ jobs:
       - name: Create RPM spec file
         run: |
           BUNDLE_DIR="$GITHUB_WORKSPACE/build/linux/x64/debug/bundle"
+          RPMROOT="$GITHUB_WORKSPACE/rpmbuild"
 
-          mkdir -p $GITHUB_WORKSPACE/rpmbuild/SPECS
-          cat > $GITHUB_WORKSPACE/rpmbuild/SPECS/frameextractor.spec << 'EOF'
-          Name:       FrameExtractor
-          Version:    1.0.0
-          Release:    1%{?dist}
-          Summary:    Effortless video frame extraction
-          License:    GPLv3
+          mkdir -p "$RPMROOT"/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
+
+          # Prep BUILDROOT manual — jangan lewat %install
+          BUILDROOT="$RPMROOT/BUILDROOT/frameextractor-1.0.0-1.x86_64"
+          mkdir -p "$BUILDROOT/opt/frameextractor"
+          cp -r "$BUNDLE_DIR/." "$BUILDROOT/opt/frameextractor/"
+
+          # Generate file list
+          FILES=$(find "$BUILDROOT" -type f | sed "s|$BUILDROOT||" | sort)
+
+          cat > "$RPMROOT/SPECS/frameextractor.spec" << SPEC
+          Name:           frameextractor
+          Version:        1.0.0
+          Release:        1%{?dist}
+          Summary:        Frame Extractor Application
+          License:        GPLv3
+          BuildArch:      x86_64
 
           %description
           FrameExtractor is a modern, cross-platform video frame extractor
           with a clean UI built with Flutter, powered by ffmpeg and yt-dlp.
           Supports local video files and direct YouTube URL extraction.
 
-          %prep
-
-          %build
-
           %install
-          mkdir -p %{buildroot}/opt/frameextractor
-          cp -r ${BUNDLE_DIR}/. %{buildroot}/opt/frameextractor/
+          exit 0
 
           %files
-          /opt/frameextractor/*
-          EOF
+          $FILES
+          SPEC
 
-      - name: Build RPM package
-        run: |
           rpmbuild -bb \
-            --define "_topdir $GITHUB_WORKSPACE/rpmbuild" \
-            $GITHUB_WORKSPACE/rpmbuild/SPECS/frameextractor.spec
+            --define "_topdir $RPMROOT" \
+            --define "_builddir $RPMROOT/BUILD" \
+            --define "__os_install_post %{nil}" \
+            "$RPMROOT/SPECS/frameextractor.spec"
 
       - name: Verify RPM created
         run: |
-          ls -la $GITHUB_WORKSPACE/rpmbuild/RPMS/*/frameextractor-*.rpm
-          rpmbuild --version
-          echo "✓ RPM build OK"
+          find $GITHUB_WORKSPACE/rpmbuild/RPMS -name "*.rpm" | grep . \
+            && echo "✓ RPM build OK" \
+            || (echo "✗ RPM not found" && exit 1)
 
   # Windows
   test-windows:
