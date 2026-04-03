@@ -10,9 +10,9 @@
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20Android-02569B?style=for-the-badge)](#download)
 
 [![Total Downloads](https://img.shields.io/github/downloads/nokarin-dev/frameextractor/total?style=for-the-badge&logoColor=%3D&color=3471eb
-)](/releases)
+)](https://github.com/nokarin-dev/FrameExtractor/releases)
 [![Latest Downloads](https://img.shields.io/github/downloads/nokarin-dev/frameextractor/latest/total?style=for-the-badge&color=3d47d4
-)](/releases/latest)
+)](https://github.com/nokarin-dev/FrameExtractor/releases/latest)
 [![Test Status](https://img.shields.io/github/actions/workflow/status/nokarin-dev/frameextractor/build-test.yml?style=for-the-badge&label=test%20build&color=22316e
 )](https://github.com/nokarin-dev/FrameExtractor/actions/workflows/build-test.yml)
 
@@ -35,7 +35,7 @@
 
 ---
 
-<img width="1536" height="100" alt="Downloads" src="https://github.com/user-attachments/assets/fdc58dff-3ba3-4b2a-98aa-d2992f02c1c0" />
+<img width="1536" height="100" alt="Downloads" tag="download" src="https://github.com/user-attachments/assets/fdc58dff-3ba3-4b2a-98aa-d2992f02c1c0" />
 
 Head to the [**Releases**](https://github.com/nokarin-dev/frameextractor/releases/latest) page and grab the build for your platform.
 
@@ -46,6 +46,7 @@ Head to the [**Releases**](https://github.com/nokarin-dev/frameextractor/release
 | 🐧 Linux Debian     | `FrameExtractor-linux-installer.deb`    | Installation for debian (Ubuntu, Linux mint, etc)           |
 | 🐧 Linux RPM        | `FrameExtractor-linux-installer.rpm`    | Installation for rpm (Fedora, RHEL, etc)                    |
 | 🐧 Linux Portable   | `FrameExtractor-linux-portable.tar.gz`  | No installation needed                                      |
+| 🐧 Linux            | `FrameExtractor-linux.AppImage`         | No installation needed                                      |
 | 🤖 Android          | `FrameExtractor-android-arm32.apk`      | Enable "Install unknown apps" in settings (For older phone) |
 | 🤖 Android          | `FrameExtractor-android-arm64.apk`      | Enable "Install unknown apps" in settings                   |
 | 🤖 Android          | `FrameExtractor-android-x86_64.apk`     | Emulators / Chromebooks                                     |
@@ -96,11 +97,11 @@ flutter build apk --release --split-per-abi # Android
 
 <img width="1536" height="100" alt="Platform Status" src="https://github.com/user-attachments/assets/66a64334-f413-4096-8618-0896fbfe8f7d" />
 
-| Platform | Tested |
-|----------|--------|
-| Windows  | ✅      |
-| Linux    | ✅      |
-| Android  | ✅      |
+| Platform |  Tested  |
+|----------|----------|
+| Windows  | ✅       |
+| Linux    | ✅       |
+| Android  | ✅       |
 
 ---
 
