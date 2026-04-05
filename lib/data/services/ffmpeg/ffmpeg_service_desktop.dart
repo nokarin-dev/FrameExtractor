@@ -1,12 +1,13 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:frameextractor/core/app_constants.dart';
 import 'package:frameextractor/core/binary_manager.dart';
 import 'package:frameextractor/data/models/extraction_params.dart';
 import 'package:frameextractor/data/models/extraction_progress.dart';
 import 'package:frameextractor/data/services/ffmpeg/ffmpeg_service_base.dart';
 
-/// Desktop implementation (Windows / Linux / macOS).
+// Desktop implementation (Windows / Linux)
 class FFmpegServiceDesktop extends FFmpegService {
   Process? _activeProcess;
 
@@ -32,18 +33,28 @@ class FFmpegServiceDesktop extends FFmpegService {
     void Function(ExtractionProgress)? onProgress,
     void Function(String)? onLog,
   }) async {
+    final errors = params.validate();
+    if (errors.isNotEmpty) {
+      onLog?.call('[ERROR] Validation failed:\n${errors.join('\n')}');
+      onProgress?.call(
+        ExtractionProgress(
+          message: 'Invalid parameters: ${errors.first}',
+          percentage: 0,
+        ),
+      );
+      return false;
+    }
+
     final est = estimateExtraction(params);
     final t0 = DateTime.now();
 
     final out =
         '${params.outputDirectory}${Platform.pathSeparator}'
         '${params.frameNamePrefix}%05d.${params.format}';
-    final qv = (1 + ((100 - params.imageQuality) * 0.3)).toInt().clamp(1, 31);
-    final vf = [
-      if (params.resolutionScale != 1.0)
-        'scale=iw*${params.resolutionScale}:ih*${params.resolutionScale}',
-      'fps=${params.fps}',
-    ].join(',');
+
+    final vf = buildVfFilter(params);
+    final qv = qualityToQv(params.imageQuality);
+    final threads = AppConstants.ffmpegThreads; // 0 = auto
 
     final args = [
       '-y',
@@ -59,6 +70,7 @@ class FFmpegServiceDesktop extends FFmpegService {
       '$qv',
       '-fps_mode',
       'vfr',
+      if (threads > 0) ...['-threads', '$threads'],
       out,
     ];
 
@@ -79,7 +91,7 @@ class FFmpegServiceDesktop extends FFmpegService {
             if (m != null) frames = int.parse(m.group(1)!);
 
             final now = DateTime.now();
-            if (now.difference(lastEmit).inMilliseconds < 500) return;
+            if (now.difference(lastEmit).inMilliseconds < 300) return;
             lastEmit = now;
 
             if (frames > 0) {
@@ -88,7 +100,7 @@ class FFmpegServiceDesktop extends FFmpegService {
                   ? ((frames / est.frames) * 100).toInt().clamp(0, 99)
                   : 0;
               Duration? eta;
-              if (est.frames > frames) {
+              if (est.frames > frames && frames > 0) {
                 eta = Duration(
                   milliseconds:
                       ((el.inMilliseconds / frames) * (est.frames - frames))
@@ -135,13 +147,14 @@ class FFmpegServiceDesktop extends FFmpegService {
       }
     } on ProcessException catch (e) {
       _activeProcess = null;
-      onLog?.call('ProcessException: ${e.message}');
+      onLog?.call('[ERROR] ProcessException: ${e.message}');
       onProgress?.call(
         ExtractionProgress(message: 'Error: ${e.message}', percentage: 0),
       );
       return false;
     } catch (e) {
       _activeProcess = null;
+      onLog?.call('[ERROR] Unexpected: $e');
       onProgress?.call(
         ExtractionProgress(message: 'Unexpected error: $e', percentage: 0),
       );

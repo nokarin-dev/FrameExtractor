@@ -1,4 +1,5 @@
 import 'package:frameextractor/data/models/extraction_params.dart';
+import 'package:frameextractor/data/models/extraction_present.dart';
 import 'package:frameextractor/data/models/extraction_progress.dart';
 import 'package:frameextractor/data/services/youtube_service.dart';
 
@@ -12,7 +13,7 @@ class StartExtraction extends ExtractionEvent {
 class StartYouTubeExtraction extends ExtractionEvent {
   final String url;
   final YouTubeQuality quality;
-  final ExtractionParams params; // output dir, fps, format, etc.
+  final ExtractionParams params;
   StartYouTubeExtraction({
     required this.url,
     required this.quality,
@@ -30,4 +31,14 @@ class UpdateProgress extends ExtractionEvent {
 class AppendLog extends ExtractionEvent {
   final String line;
   AppendLog(this.line);
+}
+
+class SavePreset extends ExtractionEvent {
+  final ExtractionPreset preset;
+  SavePreset(this.preset);
+}
+
+class DeletePreset extends ExtractionEvent {
+  final String presetId;
+  DeletePreset(this.presetId);
 }

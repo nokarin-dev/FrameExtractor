@@ -165,10 +165,10 @@ packages:
     dependency: "direct main"
     description:
       name: file_picker
-      sha256: "57d9a1dd5063f85fa3107fb42d1faffda52fdc948cefd5fe5ea85267a5fc7343"
+      sha256: "84fd4edc420fd356b4c72b733ba3b54b4b20240b9e495e3852fe015181c9ede6"
       url: "https://pub.dev"
     source: hosted
-    version: "10.3.10"
+    version: "11.0.1"
   flutter:
     dependency: "direct main"
     description: flutter
@@ -308,10 +308,10 @@ packages:
     dependency: "direct main"
     description:
       name: liquid_glass_widgets
-      sha256: "13c4b3295187e69a54eb531125358e3602d47c656488babba2f7e52f0e0dd0a8"
+      sha256: "8c075a4d985d564dc4cbbb33a749559c54d99c4dbddd2b8f3595b4e4fe38b75f"
       url: "https://pub.dev"
     source: hosted
-    version: "0.5.0"
+    version: "0.7.2"
   logger:
     dependency: "direct main"
     description:
@@ -352,14 +352,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.17.0"
-  motor:
-    dependency: transitive
-    description:
-      name: motor
-      sha256: cbd49f21b00e568c2b1a55f134ed803614a107782f4fea7769693bca32940c58
-      url: "https://pub.dev"
-    source: hosted
-    version: "1.1.0"
   native_toolchain_c:
     dependency: transitive
     description:

@@ -7,8 +7,72 @@ This project loosely follows Keep a Changelog and uses Semantic Versioning.
 ---
 
 ## [Unreleased]
+### Added
+#### Core
+- **Preset System** - Save, browse, and apply named extraction presets (FPS, format, quality, scale, time range, prefix). Built-in presets included: High Quality PNG, Fast Preview, Web Optimized, 4K Lossless
+- **Settings Persistence** - All extraction settings (FPS, format, quality, scale, time range, prefix, "open folder on done") are now saved between sessions and automatically restored on next launch
+- **Frame & Size Estimator** - Live frame count and estimated output size shown below settings when a source and output folder are selected
+- **Keyboard shortcut Ctrl+P** - Opens the Presets panel
 
-No Changes Yet.
+#### Validation
+- **Time range validation** - Start/End time fields now validate in real-time: incorrect format (non-HH:MM:SS), start ≥ end, and range < 0.1s are flagged with inline error messages. Fields turn red and extraction is blocked until fixed
+- **Pre-extraction validation** - `ExtractionParams` now has a `validate()` method and `isValid` getter. Both FFmpeg services validate params before running and emit a clear error if validation fails
+- **Illegal character check** in frame name prefix (rejects `< > : " / \ | ? *`)
+
+#### ExtractionParams improvements
+- `estimatedFrameCount` getter - calculates frames from time range × FPS
+- `estimatedSizeBytes` and `estimatedSizeFormatted` getters - rough per-format size estimate
+- `ExtractionParams.validated()` factory - throws `ArgumentError` with all error details if params are invalid
+- `==` and `hashCode` overrides for safe comparison
+- Descriptive `toString()`
+
+#### Preset Model
+- New `ExtractionPreset` model with full JSON serialization/deserialization
+- `ExtractionPreset.defaults` - 4 built-in read-only presets
+- `isDefault` flag - built-in presets cannot be deleted by the user
+
+#### AppPrefs
+- `lastFps`, `lastFormat`, `lastQuality`, `lastScale`, `lastStartTime`, `lastEndTime`, `lastPrefix`, `openFolderOnDone` - persisted extraction settings
+- `customPresets`, `allPresets`, `savePreset()`, `deletePreset()`, `clearCustomPresets()` - full preset CRUD
+
+#### AppConstants
+- `prefLastFps`, `prefLastFormat`, `prefLastQuality`, `prefLastScale`, `prefLastStartTime`, `prefLastEndTime`, `prefLastPrefix`, `prefOpenFolderOnDone`, `prefPresets` - new preference keys
+- `ffmpegThreads` constant (defaults to `0` = auto)
+- `maxCustomPresets` limit (20)
+- Expanded `supportedVideoExtensions`: added `ts`, `3gp`
+- `maxFps` raised from 60 → 120
+- `minScale` lowered from 0.25 → 0.1, `maxScale` raised from 2.0 → 4.0
+
+#### User Interface
+- **Presets panel** accessible via new title bar button (bookmarks icon) or Ctrl+P
+  - Lists all presets with name, settings summary, Apply and Delete buttons
+  - Built-in presets show a lock icon and cannot be deleted
+- **Save as Preset** button inside Advanced settings panel
+- **Estimate row** below settings card: shows `~N frames` and `~X MB` live as user adjusts FPS, format, quality, and time range
+- **Pulse animation** for progress indicator now correctly starts/stops based on actual extraction state (was always running before)
+- Time field error state: red border, red icon, red label, red tinted background, inline error text below field
+- Presets keyboard shortcut row added to Settings panel
+
+### Fixed
+#### YouTube Service
+- **Cancel flag not reset** - `YouTubeService._cancelled` was never reset to `false` before starting a new download, causing the first download after a cancellation to immediately return `null`. Fixed via new `resetCancelFlag()` method called by `ExtractionBloc` before each download
+
+#### FFmpeg Services
+- **FFmpegServiceMobile blocking UI thread** - replaced `FFmpegKit.execute()` with `FFmpegKit.executeAsync()` + polling loop, preventing jank during long extractions on mobile
+- **Scale filter quality** - resolution scaling now uses `flags=lanczos` for better downscale quality
+- Progress emit throttle reduced from 500ms → 300ms for more responsive progress updates
+- `ffmpeg_service_base.dart`: `estimateExtractionImpl` now uses a more realistic speed estimate for PNG (67% of JPG speed)
+
+#### UI
+- `_buildAdvancedToggle` now uses correct conditional opacity (only applies disabled opacity when actually disabled, was always applying it before)
+
+### Changed
+#### Architecture
+- `buildVfFilter()` and `qualityToQv()` moved to `FFmpegService` base class (shared between desktop and mobile instead of duplicated)
+- `ExtractionBloc._onStartYouTubeExtraction` now calls `youTubeService.resetCancelFlag()` before download
+- `ExtractionBloc` persists settings to `AppPrefs` after each successful extraction start via `_persistSettings()`
+- `HomeScreen._loadPrefs()` now restores all persisted extraction settings on init
+- `_validateTimeRange()` wired to both time field `TextEditingController` listeners
 
 ---
 ## [1.1.3] - 2026-04-02
@@ -68,13 +132,13 @@ No Changes Yet.
 #### User Interface
 - Mouse cursor changes to pointer on all interactive elements (buttons, chips, sliders, file rows, tabs)
 - Text cursor shown on text input fields
-- Hint bar below Extract button — explains what needs to be selected before extraction can start
+- Hint bar below Extract button - explains what needs to be selected before extraction can start
 - Clear button on video file and output folder rows for quick reset
 - Hover effect on file/folder rows using `borderHi` color
 - Hover effect on Extract and Cancel buttons (brighter fill on hover)
 - Toast notifications now include an icon (check, error, cancel)
 - Progress card background tinted by phase: blue for extraction, red for YouTube download
-- Log panel: color-coded log lines — `[ERR]` red, `[WARN]` orange, `[INFO]`/`[Android]`/`[Copy]` blue
+- Log panel: color-coded log lines - `[ERR]` red, `[WARN]` orange, `[INFO]`/`[Android]`/`[Copy]` blue
 - Log line count badge in log panel header
 
 #### Settings & UX
@@ -118,7 +182,7 @@ No Changes Yet.
 - Android (split APK: arm64, arm32, x86_64)
 
 #### Bundled Tools
-- ffmpeg and yt-dlp are included by default — no manual installation needed
+- ffmpeg and yt-dlp are included by default - no manual installation needed
 - Android uses ffmpeg_kit (JNI)
 - iOS uses native Dart-based solutions due to sandbox restrictions
 - Desktop extracts required binaries automatically on first launch

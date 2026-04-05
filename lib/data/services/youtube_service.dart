@@ -55,6 +55,10 @@ class YouTubeService {
 
   String get _bin => BinaryManager.instance.ytDlpPath;
 
+  void resetCancelFlag() {
+    _cancelled = false;
+  }
+
   Future<bool> isAvailable() async {
     if (!_useBinary) return true;
     try {
@@ -123,6 +127,8 @@ class YouTubeService {
     void Function(String, int)? onProgress,
     void Function(String)? onLog,
   }) async {
+    _cancelled = false;
+
     final tmpl = '$outputDirectory${Platform.pathSeparator}%(title)s.%(ext)s';
     final args = [
       '-f',
@@ -147,6 +153,7 @@ class YouTubeService {
           .transform(utf8.decoder)
           .transform(const LineSplitter())
           .listen((line) {
+            if (_cancelled) return;
             onLog?.call(line);
             if (!line.startsWith('[') && line.trim().isNotEmpty) {
               finalPath = line.trim();
@@ -169,13 +176,17 @@ class YouTubeService {
               );
             }
           });
+
       _activeProcess!.stderr
           .transform(utf8.decoder)
           .transform(const LineSplitter())
-          .listen((l) => onLog?.call('[ERR] $l'));
+          .listen((l) => onLog?.call('[ERROR] $l'));
 
       final code = await _activeProcess!.exitCode;
       _activeProcess = null;
+
+      if (_cancelled) return null;
+
       final resolved = finalPath ?? mergerPath;
       if (code == 0 && resolved != null) {
         onProgress?.call('Download complete', 100);
@@ -184,29 +195,27 @@ class YouTubeService {
       return null;
     } on ProcessException catch (e) {
       _activeProcess = null;
-      onLog?.call('yt-dlp error: ${e.message}');
+      onLog?.call('[ERROR] yt-dlp error: ${e.message}');
       return null;
     }
   }
 
   String _qualityToFormatCode(YouTubeQuality q) {
-    switch (q) {
-      case YouTubeQuality.p1080:
-        return 'bestvideo[height<=1080]+bestaudio/best[height<=1080]';
-      case YouTubeQuality.p720:
-        return 'bestvideo[height<=720]+bestaudio/best[height<=720]';
-      case YouTubeQuality.p480:
-        return 'bestvideo[height<=480]+bestaudio/best[height<=480]';
-      case YouTubeQuality.p360:
-        return 'bestvideo[height<=360]+bestaudio/best[height<=360]';
-      case YouTubeQuality.audioOnly:
-        return 'bestaudio/best';
-      default:
-        return 'bestvideo+bestaudio/best';
-    }
+    return switch (q) {
+      YouTubeQuality.p1080 =>
+        'bestvideo[height<=1080]+bestaudio/best[height<=1080]',
+      YouTubeQuality.p720 =>
+        'bestvideo[height<=720]+bestaudio/best[height<=720]',
+      YouTubeQuality.p480 =>
+        'bestvideo[height<=480]+bestaudio/best[height<=480]',
+      YouTubeQuality.p360 =>
+        'bestvideo[height<=360]+bestaudio/best[height<=360]',
+      YouTubeQuality.audioOnly => 'bestaudio/best',
+      _ => 'bestvideo+bestaudio/best',
+    };
   }
 
-  // youtube_explode_dart (Android/iOS)
+  // youtube_explode_dart (Android)
   Future<YouTubeVideoInfo?> _getVideoInfoExplode(String url) async {
     try {
       _ytExplode ??= yt_explode.YoutubeExplode();
@@ -301,7 +310,9 @@ class YouTubeService {
       await for (final chunk in stream) {
         if (_cancelled) {
           await sink.close();
-          await outputFile.delete();
+          try {
+            await outputFile.delete();
+          } catch (_) {}
           onLog?.call('[Cancelled]');
           return null;
         }
@@ -310,8 +321,8 @@ class YouTubeService {
         if (totalBytes > 0) {
           final pct = ((receivedBytes / totalBytes) * 100).toInt().clamp(0, 99);
           onProgress?.call(
-            'Downloading: ${(receivedBytes / 1024 / 1024).toStringAsFixed(1)}MB '
-            '/ ${(totalBytes / 1024 / 1024).toStringAsFixed(1)}MB',
+            'Downloading: ${(receivedBytes / 1024 / 1024).toStringAsFixed(1)}MB'
+            ' / ${(totalBytes / 1024 / 1024).toStringAsFixed(1)}MB',
             pct,
           );
         }

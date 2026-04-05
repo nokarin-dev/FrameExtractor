@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:frameextractor/core/android_path_helper.dart';
+import 'package:frameextractor/core/app_prefs.dart';
 import 'package:frameextractor/data/models/extraction_progress.dart';
 import 'package:frameextractor/data/services/ffmpeg/ffmpeg_service_base.dart';
 import 'package:frameextractor/data/services/youtube_service.dart';
@@ -34,6 +35,16 @@ class ExtractionBloc extends Bloc<ExtractionEvent, ExtractionState> {
       ExtractionInProgress(
         ExtractionProgress(message: 'Starting extraction…', percentage: 0),
       ),
+    );
+
+    await _persistSettings(
+      event.params.fps,
+      event.params.format,
+      event.params.imageQuality,
+      event.params.resolutionScale,
+      event.params.startTime,
+      event.params.endTime,
+      event.params.frameNamePrefix,
     );
 
     final videoPath = await AndroidPathHelper.resolveVideoPath(
@@ -98,13 +109,14 @@ class ExtractionBloc extends Bloc<ExtractionEvent, ExtractionState> {
   ) async {
     _logs.clear();
 
+    youTubeService.resetCancelFlag();
+
     final userOutputUri = event.params.outputDirectory;
     _logs.add('[DEBUG] raw outputDirectory: $userOutputUri');
     _logs.add('[DEBUG] isAndroid: ${Platform.isAndroid}');
     _logs.add('[DEBUG] isSafUri: ${AndroidPathHelper.isSafUri(userOutputUri)}');
 
     final String ffmpegOutputDir;
-
     if (Platform.isAndroid) {
       ffmpegOutputDir = await AndroidPathHelper.getWritableOutputDir();
       _logs.add('[Android] ffmpeg output → $ffmpegOutputDir');
@@ -277,7 +289,8 @@ class ExtractionBloc extends Bloc<ExtractionEvent, ExtractionState> {
         ExtractionSuccess(
           'Done! $frameCount frames saved to:\n'
           'Android/data/com.nokarin.frameextractor/files/\n\n'
-          'Access via Files app → Internal Storage → Android → data → com.nokarin.frameextractor → files',
+          'Access via Files app → Internal Storage → Android → data '
+          '→ com.nokarin.frameextractor → files',
           outputDirectory: tempDir,
         ),
       );
@@ -303,6 +316,27 @@ class ExtractionBloc extends Bloc<ExtractionEvent, ExtractionState> {
 
   void _onAppendLog(AppendLog event, Emitter<ExtractionState> emit) {
     _logs.add(event.line);
+  }
+
+  // Helpers
+  Future<void> _persistSettings(
+    int fps,
+    String format,
+    int quality,
+    double scale,
+    String startTime,
+    String endTime,
+    String prefix,
+  ) async {
+    await Future.wait([
+      AppPrefs.setLastFps(fps),
+      AppPrefs.setLastFormat(format),
+      AppPrefs.setLastQuality(quality),
+      AppPrefs.setLastScale(scale),
+      AppPrefs.setLastStartTime(startTime),
+      AppPrefs.setLastEndTime(endTime),
+      AppPrefs.setLastPrefix(prefix),
+    ]);
   }
 
   Future<void> _deleteFile(String path) async {

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:frameextractor/data/models/extraction_present.dart';
 import 'package:frameextractor/data/services/update_service.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
@@ -31,12 +32,14 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen>
     with SingleTickerProviderStateMixin {
+  // Controllers
   final _ytUrlCtrl = TextEditingController();
   final _startTimeCtrl = TextEditingController(text: AppConstants.defaultStart);
   final _endTimeCtrl = TextEditingController(text: AppConstants.defaultEnd);
   late AnimationController _pulseCtrl;
   late Animation<double> _pulseAnim;
 
+  // State
   _SourceMode _sourceMode = _SourceMode.local;
   String? _videoPath;
   String? _outputDirectory;
@@ -53,6 +56,10 @@ class _HomeScreenState extends State<HomeScreen>
   List<String> _recentVideos = [];
   UpdateResult? _updateResult;
 
+  // Time field validation
+  String? _startTimeError;
+  String? _endTimeError;
+
   bool get _isExtracting =>
       context.read<ExtractionBloc>().state is ExtractionInProgress;
 
@@ -65,6 +72,7 @@ class _HomeScreenState extends State<HomeScreen>
 
   bool get _canExtract {
     if (_outputDirectory == null) return false;
+    if (_startTimeError != null || _endTimeError != null) return false;
     if (_sourceMode == _SourceMode.local) return _videoPath != null;
     return _ytInfo != null && _ytUrlCtrl.text.trim().isNotEmpty;
   }
@@ -78,6 +86,36 @@ class _HomeScreenState extends State<HomeScreen>
       return 'Fetch a YouTube video first';
     }
     return '';
+  }
+
+  int get _estimatedFrames {
+    final params = _buildParams();
+    if (params == null) return 0;
+    return params.estimatedFrameCount;
+  }
+
+  String get _estimatedSize {
+    final params = _buildParams();
+    if (params == null) return '';
+    return params.estimatedSizeFormatted;
+  }
+
+  ExtractionParams? _buildParams() {
+    try {
+      return ExtractionParams(
+        videoPath: _videoPath ?? '',
+        outputDirectory: _outputDirectory ?? '',
+        startTime: _startTimeCtrl.text,
+        endTime: _endTimeCtrl.text,
+        fps: _fps,
+        format: _format,
+        imageQuality: _quality,
+        resolutionScale: _scale,
+        frameNamePrefix: _framePrefix,
+      );
+    } catch (_) {
+      return null;
+    }
   }
 
   @override
@@ -94,6 +132,9 @@ class _HomeScreenState extends State<HomeScreen>
     _loadPrefs();
     _updateResult = UpdateService.cachedResult;
     UpdateService.resultNotifier.addListener(_onUpdateResult);
+
+    _startTimeCtrl.addListener(_validateTimeRange);
+    _endTimeCtrl.addListener(_validateTimeRange);
   }
 
   void _onUpdateResult() {
@@ -104,9 +145,20 @@ class _HomeScreenState extends State<HomeScreen>
   Future<void> _loadPrefs() async {
     final lastOut = AppPrefs.lastOutputDir;
     final recents = AppPrefs.recentVideos;
+
     setState(() {
       if (lastOut != null) _outputDirectory = lastOut;
       _recentVideos = recents;
+
+      _fps = AppPrefs.lastFps;
+      _format = AppPrefs.lastFormat;
+      _quality = AppPrefs.lastQuality;
+      _scale = AppPrefs.lastScale;
+      _framePrefix = AppPrefs.lastPrefix;
+      _openFolderOnDone = AppPrefs.openFolderOnDone;
+
+      _startTimeCtrl.text = AppPrefs.lastStartTime;
+      _endTimeCtrl.text = AppPrefs.lastEndTime;
     });
   }
 
@@ -118,6 +170,51 @@ class _HomeScreenState extends State<HomeScreen>
     _startTimeCtrl.dispose();
     _endTimeCtrl.dispose();
     super.dispose();
+  }
+
+  // Validation
+  void _validateTimeRange() {
+    final start = _startTimeCtrl.text;
+    final end = _endTimeCtrl.text;
+
+    String? startErr;
+    String? endErr;
+
+    final timePattern = RegExp(r'^\d{2}:\d{2}:\d{2}(\.\d+)?$');
+    if (start.isNotEmpty && !timePattern.hasMatch(start)) {
+      startErr = 'Use HH:MM:SS';
+    }
+    if (end.isNotEmpty && !timePattern.hasMatch(end)) {
+      endErr = 'Use HH:MM:SS';
+    }
+
+    if (startErr == null &&
+        endErr == null &&
+        start.isNotEmpty &&
+        end.isNotEmpty) {
+      final s = _parseSeconds(start);
+      final e = _parseSeconds(end);
+      if (s != null && e != null && s >= e) {
+        startErr = 'Start must be before end';
+      }
+    }
+
+    if (startErr != _startTimeError || endErr != _endTimeError) {
+      setState(() {
+        _startTimeError = startErr;
+        _endTimeError = endErr;
+      });
+    }
+  }
+
+  double? _parseSeconds(String t) {
+    final parts = t.split(':');
+    if (parts.length != 3) return null;
+    final h = double.tryParse(parts[0]);
+    final m = double.tryParse(parts[1]);
+    final s = double.tryParse(parts[2]);
+    if (h == null || m == null || s == null) return null;
+    return h * 3600 + m * 60 + s;
   }
 
   // Build
@@ -145,6 +242,14 @@ class _HomeScreenState extends State<HomeScreen>
                 child: BlocBuilder<ExtractionBloc, ExtractionState>(
                   builder: (ctx, state) {
                     final extracting = state is ExtractionInProgress;
+
+                    if (extracting && !_pulseCtrl.isAnimating) {
+                      _pulseCtrl.repeat(reverse: true);
+                    } else if (!extracting && _pulseCtrl.isAnimating) {
+                      _pulseCtrl.stop();
+                      _pulseCtrl.reset();
+                    }
+
                     return Column(
                       children: [
                         _buildTitleBar(theme),
@@ -179,6 +284,11 @@ class _HomeScreenState extends State<HomeScreen>
                                 if (_showAdvanced && _settingsEnabled) ...[
                                   const SizedBox(height: 10),
                                   _buildAdvancedCard(theme),
+                                ],
+                                if (_settingsEnabled &&
+                                    _estimatedFrames > 0) ...[
+                                  const SizedBox(height: 6),
+                                  _buildEstimateRow(theme),
                                 ],
                                 const SizedBox(height: 10),
                                 if (extracting)
@@ -230,6 +340,42 @@ class _HomeScreenState extends State<HomeScreen>
       _showSettings();
       return;
     }
+    if (key == LogicalKeyboardKey.keyP &&
+        HardwareKeyboard.instance.isControlPressed) {
+      _showPresetsPanel();
+      return;
+    }
+  }
+
+  // Estimate Row
+  Widget _buildEstimateRow(AppTheme theme) {
+    final c = theme.colors;
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(Icons.image_outlined, size: 11, color: c.textMuted),
+        const SizedBox(width: 4),
+        Text(
+          '~$_estimatedFrames frames',
+          style: TextStyle(
+            color: c.textMuted,
+            fontSize: 11,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Icon(Icons.save_outlined, size: 11, color: c.textMuted),
+        const SizedBox(width: 4),
+        Text(
+          '~$_estimatedSize',
+          style: TextStyle(
+            color: c.textMuted,
+            fontSize: 11,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    );
   }
 
   // Title bar
@@ -246,7 +392,11 @@ class _HomeScreenState extends State<HomeScreen>
       ),
       child: Row(
         children: [
-          Image(image: AssetImage("assets/icons/icon_32.png"), width: 20, height: 20),
+          Image(
+            image: AssetImage("assets/icons/icon_32.png"),
+            width: 20,
+            height: 20,
+          ),
           const SizedBox(width: 15),
           Expanded(
             child: Column(
@@ -279,6 +429,15 @@ class _HomeScreenState extends State<HomeScreen>
             ),
             const SizedBox(width: 10),
           ],
+          _TitleBarBtn(
+            c: c,
+            icon: Icons.bookmarks_rounded,
+            tooltip: 'Presets (Ctrl+P)',
+            onTap: _showPresetsPanel,
+            isGlass: isGlass,
+            isDark: theme.isDark,
+          ),
+          const SizedBox(width: 4),
           _TitleBarBtn(
             c: c,
             icon: Icons.terminal_rounded,
@@ -411,6 +570,69 @@ class _HomeScreenState extends State<HomeScreen>
         ),
       );
     }
+  }
+
+  // Presets panel
+  void _showPresetsPanel() {
+    final theme = AppTheme.of(context);
+    if (_isDesktop) {
+      showDialog(
+        context: context,
+        barrierColor: Colors.black.withValues(
+          alpha: theme.isDark ? 0.55 : 0.30,
+        ),
+        builder: (dialogCtx) => _ThemedDialogWrapper(
+          parentContext: context,
+          builder: (liveTheme) => _GlassDialog(
+            theme: liveTheme,
+            maxWidth: 500,
+            child: _PresetsContent(
+              parentContext: context,
+              currentParams: _buildParams(),
+              onApply: _applyPreset,
+            ),
+          ),
+        ),
+      );
+    } else {
+      showModalBottomSheet(
+        context: context,
+        backgroundColor: Colors.transparent,
+        isScrollControlled: true,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        builder: (sheetCtx) => _ThemedSheetWrapper(
+          parentContext: context,
+          builder: (liveTheme) => _PresetsContent(
+            parentContext: context,
+            currentParams: _buildParams(),
+            onApply: _applyPreset,
+          ),
+        ),
+      );
+    }
+  }
+
+  void _applyPreset(ExtractionPreset preset) {
+    setState(() {
+      _fps = preset.fps;
+      _format = preset.format;
+      _quality = preset.imageQuality;
+      _scale = preset.resolutionScale;
+      _framePrefix = preset.frameNamePrefix;
+      _startTimeCtrl.text = preset.startTime;
+      _endTimeCtrl.text = preset.endTime;
+    });
+    _validateTimeRange();
+    Navigator.of(context).pop();
+    final c = AppTheme.of(context).colors;
+    _toast(
+      'Preset "${preset.name}" applied',
+      c.green,
+      c.greenDim,
+      Icons.check_circle_rounded,
+    );
   }
 
   // Source tabs
@@ -744,6 +966,7 @@ class _HomeScreenState extends State<HomeScreen>
                       controller: _startTimeCtrl,
                       label: 'Start',
                       icon: Icons.play_circle_outline_rounded,
+                      errorText: _startTimeError,
                       disabled: disabled,
                       isGlass: theme.isGlass,
                       isDark: theme.isDark,
@@ -763,6 +986,7 @@ class _HomeScreenState extends State<HomeScreen>
                       controller: _endTimeCtrl,
                       label: 'End',
                       icon: Icons.stop_circle_outlined,
+                      errorText: _endTimeError,
                       disabled: disabled,
                       isGlass: theme.isGlass,
                       isDark: theme.isDark,
@@ -779,7 +1003,7 @@ class _HomeScreenState extends State<HomeScreen>
               display: '$_fps fps',
               min: AppConstants.minFps.toDouble(),
               max: AppConstants.maxFps.toDouble(),
-              divisions: 119,
+              divisions: AppConstants.maxFps - AppConstants.minFps,
               color: c.accent,
               disabled: disabled,
               onChanged: (v) => setState(() => _fps = v.toInt()),
@@ -924,6 +1148,49 @@ class _HomeScreenState extends State<HomeScreen>
               ],
             ),
           ),
+          _Divider(c: c, isGlass: theme.isGlass, isDark: theme.isDark),
+          Padding(
+            padding: const EdgeInsets.all(14),
+            child: MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: GestureDetector(
+                onTap: () => _showSavePresetDialog(theme),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  decoration: BoxDecoration(
+                    color: theme.isGlass
+                        ? c.purple.withValues(alpha: 0.12)
+                        : c.surface,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: theme.isGlass
+                          ? c.purple.withValues(alpha: 0.35)
+                          : c.border,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.bookmark_add_rounded,
+                        color: c.purple,
+                        size: 14,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Save as Preset',
+                        style: TextStyle(
+                          color: c.purple,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -963,6 +1230,185 @@ class _HomeScreenState extends State<HomeScreen>
                 ),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Presets dialog
+  void _showSavePresetDialog(AppTheme theme) {
+    final c = theme.colors;
+    final nameCtrl = TextEditingController();
+
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: theme.isDark ? 0.55 : 0.30),
+      builder: (_) => Dialog(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 32, vertical: 80),
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 340),
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: theme.isGlass
+                ? c.surface.withValues(alpha: theme.isDark ? 0.30 : 0.82)
+                : c.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: theme.isGlass
+                  ? (theme.isDark
+                        ? Colors.white.withValues(alpha: 0.20)
+                        : c.borderHi)
+                  : c.border,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(
+                  alpha: theme.isDark ? 0.45 : 0.12,
+                ),
+                blurRadius: 32,
+                offset: const Offset(0, 12),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Save Preset',
+                style: TextStyle(
+                  color: c.textPri,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Saves current FPS, format, quality, scale, time range, and prefix.',
+                style: TextStyle(color: c.textSec, fontSize: 12, height: 1.4),
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: nameCtrl,
+                autofocus: true,
+                style: TextStyle(color: c.textPri, fontSize: 13),
+                decoration: InputDecoration(
+                  hintText: 'Preset name…',
+                  hintStyle: TextStyle(color: c.textMuted, fontSize: 13),
+                  filled: true,
+                  fillColor: theme.isGlass
+                      ? (theme.isDark
+                            ? Colors.white.withValues(alpha: 0.07)
+                            : c.surfaceHi)
+                      : c.surfaceHi,
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 10,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: c.border),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: c.border),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: c.accent, width: 1.5),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => Navigator.of(context).pop(),
+                      child: MouseRegion(
+                        cursor: SystemMouseCursors.click,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          decoration: BoxDecoration(
+                            color: c.surfaceHi,
+                            borderRadius: BorderRadius.circular(9),
+                            border: Border.all(color: c.border),
+                          ),
+                          child: Center(
+                            child: Text(
+                              'Cancel',
+                              style: TextStyle(
+                                color: c.textSec,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () async {
+                        final name = nameCtrl.text.trim();
+                        if (name.isEmpty) return;
+                        final preset = ExtractionPreset(
+                          id: 'custom_${DateTime.now().millisecondsSinceEpoch}',
+                          name: name,
+                          fps: _fps,
+                          format: _format,
+                          imageQuality: _quality,
+                          resolutionScale: _scale,
+                          startTime: _startTimeCtrl.text,
+                          endTime: _endTimeCtrl.text,
+                          frameNamePrefix: _framePrefix,
+                          createdAt: DateTime.now(),
+                        );
+                        await AppPrefs.savePreset(preset);
+                        if (!mounted) return;
+                        Navigator.of(context).pop();
+                        final col = AppTheme.of(context).colors;
+                        _toast(
+                          'Preset "$name" saved!',
+                          col.purple,
+                          col.purple.withValues(alpha: 0.12),
+                          Icons.bookmark_added_rounded,
+                        );
+                      },
+                      child: MouseRegion(
+                        cursor: SystemMouseCursors.click,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          decoration: BoxDecoration(
+                            color: c.purple.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(9),
+                            border: Border.all(
+                              color: c.purple.withValues(alpha: 0.50),
+                            ),
+                          ),
+                          child: Center(
+                            child: Text(
+                              'Save',
+                              style: TextStyle(
+                                color: c.purple,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
         ),
       ),
@@ -1152,6 +1598,8 @@ class _HomeScreenState extends State<HomeScreen>
       msg = 'Select an output folder to continue';
     } else if (_sourceMode == _SourceMode.youtube && _ytInfo == null) {
       msg = 'Fetch a YouTube video to continue';
+    } else if (_startTimeError != null || _endTimeError != null) {
+      msg = 'Fix the time range errors to continue';
     } else {
       return const SizedBox.shrink();
     }
@@ -1272,8 +1720,9 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
+  // File picker
   Future<void> _pickVideoFile() async {
-    final r = await FilePicker.platform.pickFiles(type: FileType.video);
+    final r = await FilePicker.pickFiles(type: FileType.video);
     if (r?.files.single.path != null) {
       final path = r!.files.single.path!;
       await AppPrefs.addRecentVideo(path);
@@ -1285,7 +1734,7 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Future<void> _pickOutputDirectory() async {
-    final r = await FilePicker.platform.getDirectoryPath();
+    final r = await FilePicker.getDirectoryPath();
     if (r != null) {
       await AppPrefs.setLastOutputDir(r);
       setState(() => _outputDirectory = r);
@@ -1316,8 +1765,9 @@ class _HomeScreenState extends State<HomeScreen>
     }
   }
 
+  // Extraction
   void _startExtraction() {
-    final baseParams = ExtractionParams(
+    final params = ExtractionParams(
       videoPath: _videoPath ?? '',
       outputDirectory: _outputDirectory!,
       startTime: _startTimeCtrl.text,
@@ -1328,16 +1778,23 @@ class _HomeScreenState extends State<HomeScreen>
       resolutionScale: _scale,
       frameNamePrefix: _framePrefix,
     );
+
+    final errors = params.validate();
+    if (errors.isNotEmpty) {
+      final c = AppTheme.of(context).colors;
+      _toast(errors.first, c.red, c.redDim, Icons.error_rounded);
+      return;
+    }
     if (_sourceMode == _SourceMode.youtube) {
       context.read<ExtractionBloc>().add(
         StartYouTubeExtraction(
           url: _ytUrlCtrl.text.trim(),
           quality: _ytQuality,
-          params: baseParams,
+          params: params,
         ),
       );
     } else {
-      context.read<ExtractionBloc>().add(StartExtraction(baseParams));
+      context.read<ExtractionBloc>().add(StartExtraction(params));
     }
   }
 
@@ -1656,7 +2113,7 @@ class _ClassicAppCard extends StatelessWidget {
   }
 }
 
-// SettingsContent
+// Settings Content
 class _SettingsContent extends StatelessWidget {
   final BuildContext parentContext;
   const _SettingsContent({required this.parentContext});
@@ -2020,7 +2477,302 @@ class _WarningBullet extends StatelessWidget {
   );
 }
 
-// LogContent
+// Preset Content
+class _PresetsContent extends StatelessWidget {
+  final BuildContext parentContext;
+  final ExtractionParams? currentParams;
+  final void Function(ExtractionPreset) onApply;
+
+  const _PresetsContent({
+    required this.parentContext,
+    required this.currentParams,
+    required this.onApply,
+  });
+
+  @override
+  Widget build(BuildContext context) => _LiveThemeChild(
+    parentContext: parentContext,
+    builder: (liveTheme) => _PresetsBody(
+      theme: liveTheme,
+      currentParams: currentParams,
+      onApply: onApply,
+      parentContext: parentContext,
+    ),
+  );
+}
+
+class _PresetsBody extends StatefulWidget {
+  final AppTheme theme;
+  final ExtractionParams? currentParams;
+  final void Function(ExtractionPreset) onApply;
+  final BuildContext parentContext;
+
+  const _PresetsBody({
+    required this.theme,
+    required this.currentParams,
+    required this.onApply,
+    required this.parentContext,
+  });
+
+  @override
+  State<_PresetsBody> createState() => _PresetsBodyState();
+}
+
+class _PresetsBodyState extends State<_PresetsBody> {
+  late List<ExtractionPreset> _presets;
+
+  @override
+  void initState() {
+    super.initState();
+    _presets = AppPrefs.allPresets;
+  }
+
+  Future<void> _deletePreset(ExtractionPreset preset) async {
+    await AppPrefs.deletePreset(preset.id);
+    setState(() => _presets = AppPrefs.allPresets);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = widget.theme.colors;
+    final isGlass = widget.theme.isGlass;
+
+    return SizedBox(
+      height: 520,
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+            child: Row(
+              children: [
+                Icon(Icons.bookmarks_rounded, color: c.purple, size: 16),
+                const SizedBox(width: 8),
+                Text(
+                  'Presets',
+                  style: TextStyle(
+                    color: c.textPri,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isGlass
+                        ? (widget.theme.isDark
+                              ? Colors.white.withValues(alpha: 0.08)
+                              : c.surfaceHi)
+                        : c.surfaceHi,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    '${_presets.length} presets',
+                    style: TextStyle(
+                      color: c.textSec,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                _CloseBtn(c: c, isGlass: isGlass, isDark: widget.theme.isDark),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            height: 1,
+            color: isGlass
+                ? (widget.theme.isDark
+                      ? Colors.white.withValues(alpha: 0.08)
+                      : c.border)
+                : c.border,
+          ),
+          Expanded(
+            child: _presets.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.bookmark_border_rounded,
+                          color: c.textMuted,
+                          size: 32,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'No presets yet.',
+                          style: TextStyle(color: c.textMuted, fontSize: 13),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Open Advanced settings to save one.',
+                          style: TextStyle(color: c.textMuted, fontSize: 11),
+                        ),
+                      ],
+                    ),
+                  )
+                : ListView.separated(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    itemCount: _presets.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 6),
+                    itemBuilder: (_, i) {
+                      final preset = _presets[i];
+                      return _PresetTile(
+                        preset: preset,
+                        theme: widget.theme,
+                        onApply: () => widget.onApply(preset),
+                        onDelete: preset.isDefault
+                            ? null
+                            : () => _deletePreset(preset),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PresetTile extends StatelessWidget {
+  final ExtractionPreset preset;
+  final AppTheme theme;
+  final VoidCallback onApply;
+  final VoidCallback? onDelete;
+
+  const _PresetTile({
+    required this.preset,
+    required this.theme,
+    required this.onApply,
+    this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = theme.colors;
+    final isGlass = theme.isGlass;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isGlass
+            ? (theme.isDark
+                  ? Colors.white.withValues(alpha: 0.06)
+                  : c.surface.withValues(alpha: 0.65))
+            : c.surfaceHi,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isGlass
+              ? (theme.isDark
+                    ? Colors.white.withValues(alpha: 0.12)
+                    : c.borderHi.withValues(alpha: 0.60))
+              : c.border,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: c.purple.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(9),
+            ),
+            child: Icon(
+              preset.isDefault
+                  ? Icons.bookmark_rounded
+                  : Icons.bookmark_added_rounded,
+              color: c.purple,
+              size: 17,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  preset.name,
+                  style: TextStyle(
+                    color: c.textPri,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '${preset.fps}fps · ${preset.format.toUpperCase()} · '
+                  '${preset.imageQuality}% · ${(preset.resolutionScale * 100).toInt()}%',
+                  style: TextStyle(color: c.textMuted, fontSize: 11),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          if (onDelete != null)
+            MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: GestureDetector(
+                onTap: onDelete,
+                child: Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: isGlass ? c.red.withValues(alpha: 0.10) : c.redDim,
+                    borderRadius: BorderRadius.circular(7),
+                    border: Border.all(color: c.red.withValues(alpha: 0.30)),
+                  ),
+                  child: Icon(
+                    Icons.delete_outline_rounded,
+                    color: c.red,
+                    size: 14,
+                  ),
+                ),
+              ),
+            ),
+          const SizedBox(width: 6),
+          MouseRegion(
+            cursor: SystemMouseCursors.click,
+            child: GestureDetector(
+              onTap: onApply,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: isGlass
+                      ? c.purple.withValues(alpha: 0.18)
+                      : c.purple.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: c.purple.withValues(alpha: 0.45)),
+                ),
+                child: Text(
+                  'Apply',
+                  style: TextStyle(
+                    color: c.purple,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// Log Content
 class _LogContent extends StatelessWidget {
   final List<String> logs;
   final BuildContext parentContext;
@@ -2839,6 +3591,8 @@ class _TimeField extends StatelessWidget {
   final String label;
   final IconData icon;
   final bool disabled, isGlass, isDark;
+  final String? errorText;
+
   const _TimeField({
     required this.c,
     required this.controller,
@@ -2847,26 +3601,37 @@ class _TimeField extends StatelessWidget {
     this.disabled = false,
     this.isGlass = false,
     this.isDark = true,
+    this.errorText,
   });
 
   @override
   Widget build(BuildContext context) {
+    final hasError = errorText != null;
     final fillColor = isGlass
         ? (isDark
               ? Colors.white.withValues(alpha: disabled ? 0.04 : 0.08)
               : c.surface.withValues(alpha: disabled ? 0.40 : 0.65))
         : (disabled ? c.disabled : c.surfaceHi);
-    final borderColor = isGlass
+
+    final borderColor = hasError
+        ? c.red
+        : isGlass
         ? (isDark
               ? Colors.white.withValues(alpha: disabled ? 0.08 : 0.18)
               : c.border.withValues(alpha: disabled ? 0.40 : 0.70))
         : c.border;
-    final labelColor = isGlass
+
+    final labelColor = hasError
+        ? c.red
+        : isGlass
         ? (isDark
               ? Colors.white.withValues(alpha: disabled ? 0.20 : 0.50)
               : (disabled ? c.textMuted : c.textSec))
         : c.textSec;
-    final iconColor = isGlass
+
+    final iconColor = hasError
+        ? c.red
+        : isGlass
         ? (isDark ? Colors.white.withValues(alpha: 0.35) : c.textMuted)
         : c.textMuted;
 
@@ -2874,7 +3639,7 @@ class _TimeField extends StatelessWidget {
       controller: controller,
       enabled: !disabled,
       style: TextStyle(
-        color: disabled ? c.textMuted : c.textPri,
+        color: hasError ? c.red : (disabled ? c.textMuted : c.textPri),
         fontSize: 13,
         fontWeight: FontWeight.w500,
       ),
@@ -2885,13 +3650,19 @@ class _TimeField extends StatelessWidget {
           fontSize: 11,
           fontWeight: FontWeight.w600,
         ),
+        errorText: errorText,
+        errorStyle: TextStyle(color: c.red, fontSize: 9, height: 0.9),
         prefixIcon: Icon(icon, color: iconColor, size: 14),
         prefixIconConstraints: const BoxConstraints(
           minWidth: 30,
           minHeight: 30,
         ),
         filled: true,
-        fillColor: fillColor,
+        fillColor: hasError
+            ? (isGlass
+                  ? c.red.withValues(alpha: 0.06)
+                  : c.redDim.withValues(alpha: 0.5))
+            : fillColor,
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 10,
           vertical: 10,
@@ -2902,7 +3673,10 @@ class _TimeField extends StatelessWidget {
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: borderColor),
+          borderSide: BorderSide(
+            color: borderColor,
+            width: hasError ? 1.5 : 1.0,
+          ),
         ),
         disabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
@@ -2910,7 +3684,18 @@ class _TimeField extends StatelessWidget {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: c.accent, width: 1.5),
+          borderSide: BorderSide(
+            color: hasError ? c.red : c.accent,
+            width: 1.5,
+          ),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide(color: c.red, width: 1.5),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide(color: c.red, width: 1.5),
         ),
       ),
     );

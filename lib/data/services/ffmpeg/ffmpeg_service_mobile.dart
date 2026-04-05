@@ -6,7 +6,7 @@ import 'package:frameextractor/data/models/extraction_params.dart';
 import 'package:frameextractor/data/models/extraction_progress.dart';
 import 'package:frameextractor/data/services/ffmpeg/ffmpeg_service_base.dart';
 
-/// Mobile implementation (Android / iOS).
+// Mobile implementation (Android)
 class FFmpegServiceMobile extends FFmpegService {
   @override
   Future<bool> isFFmpegAvailable() async {
@@ -28,17 +28,25 @@ class FFmpegServiceMobile extends FFmpegService {
     void Function(ExtractionProgress)? onProgress,
     void Function(String)? onLog,
   }) async {
+    final errors = params.validate();
+    if (errors.isNotEmpty) {
+      onLog?.call('[ERROR] Validation failed:\n${errors.join('\n')}');
+      onProgress?.call(
+        ExtractionProgress(
+          message: 'Invalid parameters: ${errors.first}',
+          percentage: 0,
+        ),
+      );
+      return false;
+    }
+
     final est = estimateExtraction(params);
     final t0 = DateTime.now();
 
     final out =
         '${params.outputDirectory}/${params.frameNamePrefix}%05d.${params.format}';
-    final qv = (1 + ((100 - params.imageQuality) * 0.3)).toInt().clamp(1, 31);
-    final vf = [
-      if (params.resolutionScale != 1.0)
-        'scale=iw*${params.resolutionScale}:ih*${params.resolutionScale}',
-      'fps=${params.fps}',
-    ].join(',');
+    final vf = buildVfFilter(params);
+    final qv = qualityToQv(params.imageQuality);
 
     final cmd =
         '-y -ss ${params.startTime} -to ${params.endTime} '
@@ -48,10 +56,12 @@ class FFmpegServiceMobile extends FFmpegService {
 
     var frames = 0;
     var lastEmit = DateTime.now();
+    var completed = false;
+    var success = false;
 
     FFmpegKitConfig.enableStatisticsCallback((stats) {
       final now = DateTime.now();
-      if (now.difference(lastEmit).inMilliseconds < 500) return;
+      if (now.difference(lastEmit).inMilliseconds < 300) return;
       lastEmit = now;
 
       final timeSec = stats.getTime() / 1000.0;
@@ -63,7 +73,7 @@ class FFmpegServiceMobile extends FFmpegService {
             ? ((frames / est.frames) * 100).toInt().clamp(0, 99)
             : 0;
         Duration? eta;
-        if (est.frames > frames) {
+        if (est.frames > frames && frames > 0) {
           eta = Duration(
             milliseconds: ((el.inMilliseconds / frames) * (est.frames - frames))
                 .toInt(),
@@ -84,12 +94,18 @@ class FFmpegServiceMobile extends FFmpegService {
 
     FFmpegKitConfig.enableLogCallback((log) => onLog?.call(log.getMessage()));
 
-    final session = await FFmpegKit.execute(cmd);
+    final session = await FFmpegKit.executeAsync(cmd, (completedSession) async {
+      success = ReturnCode.isSuccess(await completedSession.getReturnCode());
+      completed = true;
+    });
+
+    while (!completed) {
+      await Future.delayed(const Duration(milliseconds: 100));
+    }
 
     FFmpegKitConfig.enableStatisticsCallback(null);
     FFmpegKitConfig.enableLogCallback(null);
 
-    final success = ReturnCode.isSuccess(await session.getReturnCode());
     final total = DateTime.now().difference(t0);
 
     if (success) {
@@ -111,7 +127,7 @@ class FFmpegServiceMobile extends FFmpegService {
           timeElapsed: total,
         ),
       );
-      onLog?.call('FFmpeg error: $output');
+      onLog?.call('[ERROR] FFmpeg output: $output');
     }
 
     return success;
