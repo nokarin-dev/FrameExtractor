@@ -52,6 +52,7 @@ This project loosely follows Keep a Changelog and uses Semantic Versioning.
 - **Pulse animation** for progress indicator now correctly starts/stops based on actual extraction state (was always running before)
 - Time field error state: red border, red icon, red label, red tinted background, inline error text below field
 - Presets keyboard shortcut row added to Settings panel
+- FrameExtractor version on settings
 
 ### Fixed
 #### YouTube Service

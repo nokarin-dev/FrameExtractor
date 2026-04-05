@@ -5,7 +5,7 @@
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "FrameExtractor is a modern, cross-platform video frame extractor with a clean UI powered by ffmpeg & yt-dlp.",
+    "description": "FrameExtractor is a modern, cross-platform video frame extractor with a clean UI built with Flutter, powered by ffmpeg and yt-dlp. Supports local video files and direct YouTube URL extraction.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

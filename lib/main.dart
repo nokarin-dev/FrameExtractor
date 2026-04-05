@@ -25,8 +25,8 @@ void main() async {
     await windowManager.ensureInitialized();
     await windowManager.waitUntilReadyToShow(
       const WindowOptions(
-        size: Size(1020, 640),
-        minimumSize: Size(640, 420),
+        size: Size(1280, 720),
+        minimumSize: Size(840, 620),
         center: true,
         titleBarStyle: TitleBarStyle.hidden,
         windowButtonVisibility: false,

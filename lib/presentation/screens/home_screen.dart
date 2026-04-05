@@ -2259,12 +2259,29 @@ class _SettingsBody extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 20),
-          _SectionLabel(c: c, label: 'KEYBOARD SHORTCUTS'),
-          const SizedBox(height: 10),
-          _ShortcutRow(c: c, key_: 'Space', label: 'Start extraction'),
-          _ShortcutRow(c: c, key_: 'Esc', label: 'Cancel extraction'),
-          _ShortcutRow(c: c, key_: 'Ctrl+L', label: 'Open log panel'),
-          _ShortcutRow(c: c, key_: 'Ctrl+S', label: 'Open settings panel'),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _SectionLabel(c: c, label: 'KEYBOARD SHORTCUTS'),
+                    const SizedBox(height: 10),
+                    _ShortcutRow(c: c, key_: 'Space', label: 'Start extraction'),
+                    _ShortcutRow(c: c, key_: 'Esc', label: 'Cancel extraction'),
+                    _ShortcutRow(c: c, key_: 'Ctrl+L', label: 'Open log panel'),
+                    _ShortcutRow(c: c, key_: 'Ctrl+S', label: 'Open settings panel'),
+                  ],
+                ),
+              ),
+              Text(
+                "${AppConstants.appName} ${AppConstants.appVersion}",
+                style: TextStyle(color: c.textSec, fontSize: 10),
+              ),
+            ],
+          ),
         ],
       ),
     );

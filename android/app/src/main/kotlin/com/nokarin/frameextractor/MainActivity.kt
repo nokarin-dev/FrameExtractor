@@ -28,7 +28,7 @@ class MainActivity : FlutterActivity() {
                             val uri = uriString.toUri()
                             val path = UriHelper.getPathFromUri(this, uri)
                             result.success(path)
-                        } catch (e: Exception) {
+                        } catch (_: Exception) {
                             result.success(null)
                         }
                     }
