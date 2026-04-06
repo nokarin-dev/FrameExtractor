@@ -1,6 +1,6 @@
 class AppConstants {
   // App info
-  static const String appName = 'Frame Extractor';
+  static const String appName = 'FrameExtractor';
   static const String appVersion = '1.2.0';
   static const String appDescription = 'Effortless video frame extraction';
 
@@ -32,6 +32,8 @@ class AppConstants {
     'm4v',
     'mpg',
     'mpeg',
+    'ts',
+    '3gp',
   ];
 
   // Preferences

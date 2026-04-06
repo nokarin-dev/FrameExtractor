@@ -13,11 +13,13 @@ This project loosely follows Keep a Changelog and uses Semantic Versioning.
 - **Settings Persistence** - All extraction settings (FPS, format, quality, scale, time range, prefix, "open folder on done") are now saved between sessions and automatically restored on next launch
 - **Frame & Size Estimator** - Live frame count and estimated output size shown below settings when a source and output folder are selected
 - **Keyboard shortcut Ctrl+P** - Opens the Presets panel
+- **Close confirmation dialog** - Closing the window while extraction is in progress now shows a confirmation dialog ("Keep Running" / "Close Anyway") instead of immediately terminating the process
 
 #### Validation
 - **Time range validation** - Start/End time fields now validate in real-time: incorrect format (non-HH:MM:SS), start ≥ end, and range < 0.1s are flagged with inline error messages. Fields turn red and extraction is blocked until fixed
 - **Pre-extraction validation** - `ExtractionParams` now has a `validate()` method and `isValid` getter. Both FFmpeg services validate params before running and emit a clear error if validation fails
 - **Illegal character check** in frame name prefix (rejects `< > : " / \ | ? *`)
+- **Recent video file validation** - Recent video entries are now checked for existence on disk at startup; stale entries are automatically removed from the list
 
 #### ExtractionParams improvements
 - `estimatedFrameCount` getter - calculates frames from time range × FPS
@@ -50,13 +52,15 @@ This project loosely follows Keep a Changelog and uses Semantic Versioning.
 - **Save as Preset** button inside Advanced settings panel
 - **Estimate row** below settings card: shows `~N frames` and `~X MB` live as user adjusts FPS, format, quality, and time range
 - **Pulse animation** for progress indicator now correctly starts/stops based on actual extraction state (was always running before)
+- **Full path tooltip** on Video File and Output Folder rows — hovering shows the complete file/directory path, not just the truncated filename
 - Time field error state: red border, red icon, red label, red tinted background, inline error text below field
-- Presets keyboard shortcut row added to Settings panel
-- FrameExtractor version on settings
+- Presets keyboard shortcut `Ctrl+P` row added to Settings panel
+- Update badge label changed from generic "out-of-date" to the specific version string (e.g. "v1.2.0 available")
 
 ### Fixed
 #### YouTube Service
 - **Cancel flag not reset** - `YouTubeService._cancelled` was never reset to `false` before starting a new download, causing the first download after a cancellation to immediately return `null`. Fixed via new `resetCancelFlag()` method called by `ExtractionBloc` before each download
+- **YouTubeService recreated on every fetch** - `_fetchYtInfo()` was instantiating a new `YouTubeService()` on each button press. It now reuses the instance owned by `ExtractionBloc`, avoiding redundant allocations and potential state inconsistency
 
 #### FFmpeg Services
 - **FFmpegServiceMobile blocking UI thread** - replaced `FFmpegKit.execute()` with `FFmpegKit.executeAsync()` + polling loop, preventing jank during long extractions on mobile
@@ -64,16 +68,21 @@ This project loosely follows Keep a Changelog and uses Semantic Versioning.
 - Progress emit throttle reduced from 500ms → 300ms for more responsive progress updates
 - `ffmpeg_service_base.dart`: `estimateExtractionImpl` now uses a more realistic speed estimate for PNG (67% of JPG speed)
 
-#### UI
-- `_buildAdvancedToggle` now uses correct conditional opacity (only applies disabled opacity when actually disabled, was always applying it before)
+#### User Interface
+- **`_LiveThemeChild` polling loop removed** - the 100ms polling timer that detected theme changes by repeated `AppTheme.of()` calls is eliminated. Dialogs and sheets now read theme directly from the `InheritedWidget` (`AppTheme.of()`), which rebuilds automatically on change with zero overhead
+- **`_AppThemeNotifier` static singleton removed** - the leaked `ChangeNotifier` singleton that was never disposed is fully removed. Theme propagation now relies exclusively on Flutter's `InheritedWidget` mechanism
+- **`BlocBuilder` rebuild scope reduced** - the main `Column` is no longer wrapped in a single `BlocBuilder`. Each section (source card, output card, settings, progress, action buttons) now has its own narrowly-scoped `BlocBuilder` with `buildWhen` guards, so progress updates only rebuild the progress card instead of the entire screen
+- **Pulse animation no longer synced inside `BlocBuilder` builder** - starting/stopping `_pulseCtrl` is now handled in `BlocListener` (side-effect handler) instead of the `BlocBuilder` rebuild cycle, preventing potential animation restart glitches
+- **`ExtractionParams` construction cached** - estimate values (`_cachedEstimatedFrames`, `_cachedEstimatedSize`) are computed once via `_refreshEstimates()` when inputs change (slider, format chip, time field), instead of rebuilding `ExtractionParams` on every `build()` call
+- **`_buildAdvancedToggle` opacity corrected** - was always applying the disabled opacity value regardless of the `disabled` flag. Now only applies reduced opacity when the toggle is actually disabled
 
 ### Changed
 #### Architecture
 - `buildVfFilter()` and `qualityToQv()` moved to `FFmpegService` base class (shared between desktop and mobile instead of duplicated)
 - `ExtractionBloc._onStartYouTubeExtraction` now calls `youTubeService.resetCancelFlag()` before download
 - `ExtractionBloc` persists settings to `AppPrefs` after each successful extraction start via `_persistSettings()`
-- `HomeScreen._loadPrefs()` now restores all persisted extraction settings on init
-- `_validateTimeRange()` wired to both time field `TextEditingController` listeners
+- `HomeScreen._loadPrefs()` now restores all persisted extraction settings on init, and filters stale recent video entries asynchronously
+- `_validateTimeRange()` wired to `_onTimeChanged()` listener which also triggers `_refreshEstimates()`, keeping estimate display in sync with time field edits
 
 ---
 ## [1.1.3] - 2026-04-02

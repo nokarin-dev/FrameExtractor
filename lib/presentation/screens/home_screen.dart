@@ -88,21 +88,13 @@ class _HomeScreenState extends State<HomeScreen>
     return '';
   }
 
-  int get _estimatedFrames {
-    final params = _buildParams();
-    if (params == null) return 0;
-    return params.estimatedFrameCount;
-  }
+  ExtractionParams? _cachedParams;
+  int _cachedEstimatedFrames = 0;
+  String _cachedEstimatedSize = '';
 
-  String get _estimatedSize {
-    final params = _buildParams();
-    if (params == null) return '';
-    return params.estimatedSizeFormatted;
-  }
-
-  ExtractionParams? _buildParams() {
+  void _refreshEstimates() {
     try {
-      return ExtractionParams(
+      _cachedParams = ExtractionParams(
         videoPath: _videoPath ?? '',
         outputDirectory: _outputDirectory ?? '',
         startTime: _startTimeCtrl.text,
@@ -113,10 +105,16 @@ class _HomeScreenState extends State<HomeScreen>
         resolutionScale: _scale,
         frameNamePrefix: _framePrefix,
       );
+      _cachedEstimatedFrames = _cachedParams!.estimatedFrameCount;
+      _cachedEstimatedSize = _cachedParams!.estimatedSizeFormatted;
     } catch (_) {
-      return null;
+      _cachedParams = null;
+      _cachedEstimatedFrames = 0;
+      _cachedEstimatedSize = '';
     }
   }
+
+  ExtractionParams? _buildParams() => _cachedParams;
 
   @override
   void initState() {
@@ -133,8 +131,8 @@ class _HomeScreenState extends State<HomeScreen>
     _updateResult = UpdateService.cachedResult;
     UpdateService.resultNotifier.addListener(_onUpdateResult);
 
-    _startTimeCtrl.addListener(_validateTimeRange);
-    _endTimeCtrl.addListener(_validateTimeRange);
+    _startTimeCtrl.addListener(_onTimeChanged);
+    _endTimeCtrl.addListener(_onTimeChanged);
   }
 
   void _onUpdateResult() {
@@ -142,9 +140,14 @@ class _HomeScreenState extends State<HomeScreen>
     setState(() => _updateResult = UpdateService.resultNotifier.value);
   }
 
+  void _onTimeChanged() {
+    _validateTimeRange();
+    _refreshEstimates();
+  }
+
   Future<void> _loadPrefs() async {
     final lastOut = AppPrefs.lastOutputDir;
-    final recents = AppPrefs.recentVideos;
+    final recents = await _filterExistingRecents(AppPrefs.recentVideos);
 
     setState(() {
       if (lastOut != null) _outputDirectory = lastOut;
@@ -160,6 +163,15 @@ class _HomeScreenState extends State<HomeScreen>
       _startTimeCtrl.text = AppPrefs.lastStartTime;
       _endTimeCtrl.text = AppPrefs.lastEndTime;
     });
+    _refreshEstimates();
+  }
+
+  Future<List<String>> _filterExistingRecents(List<String> paths) async {
+    final result = <String>[];
+    for (final p in paths) {
+      if (await File(p).exists()) result.add(p);
+    }
+    return result;
   }
 
   @override
@@ -243,13 +255,6 @@ class _HomeScreenState extends State<HomeScreen>
                   builder: (ctx, state) {
                     final extracting = state is ExtractionInProgress;
 
-                    if (extracting && !_pulseCtrl.isAnimating) {
-                      _pulseCtrl.repeat(reverse: true);
-                    } else if (!extracting && _pulseCtrl.isAnimating) {
-                      _pulseCtrl.stop();
-                      _pulseCtrl.reset();
-                    }
-
                     return Column(
                       children: [
                         _buildTitleBar(theme),
@@ -286,7 +291,7 @@ class _HomeScreenState extends State<HomeScreen>
                                   _buildAdvancedCard(theme),
                                 ],
                                 if (_settingsEnabled &&
-                                    _estimatedFrames > 0) ...[
+                                    _cachedEstimatedFrames > 0) ...[
                                   const SizedBox(height: 6),
                                   _buildEstimateRow(theme),
                                 ],
@@ -356,7 +361,7 @@ class _HomeScreenState extends State<HomeScreen>
         Icon(Icons.image_outlined, size: 11, color: c.textMuted),
         const SizedBox(width: 4),
         Text(
-          '~$_estimatedFrames frames',
+          '~$_cachedEstimatedFrames frames',
           style: TextStyle(
             color: c.textMuted,
             fontSize: 11,
@@ -367,7 +372,7 @@ class _HomeScreenState extends State<HomeScreen>
         Icon(Icons.save_outlined, size: 11, color: c.textMuted),
         const SizedBox(width: 4),
         Text(
-          '~$_estimatedSize',
+          '~$_cachedEstimatedSize',
           style: TextStyle(
             color: c.textMuted,
             fontSize: 11,
@@ -470,7 +475,7 @@ class _HomeScreenState extends State<HomeScreen>
               c: c,
               icon: Icons.close_rounded,
               tooltip: 'Close',
-              onTap: () => windowManager.close(),
+              onTap: _handleClose,
               hoverColor: c.red,
               isGlass: isGlass,
               isDark: theme.isDark,
@@ -501,6 +506,150 @@ class _HomeScreenState extends State<HomeScreen>
       onPanStart: _isDesktop ? (_) => windowManager.startDragging() : null,
       child: inner,
     );
+  }
+
+  Future<void> _handleClose() async {
+    if (_isExtracting) {
+      final confirmed = await _showCloseConfirmDialog();
+      if (!confirmed || !mounted) return;
+    }
+    await windowManager.close();
+  }
+
+  Future<bool> _showCloseConfirmDialog() async {
+    final theme = AppTheme.of(context);
+    final c = theme.colors;
+    final result = await showDialog<bool>(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: theme.isDark ? 0.55 : 0.30),
+      builder: (_) => Dialog(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 32, vertical: 80),
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 360),
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: theme.isGlass
+                ? c.surface.withValues(alpha: theme.isDark ? 0.30 : 0.82)
+                : c.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: theme.isGlass
+                  ? (theme.isDark
+                        ? Colors.white.withValues(alpha: 0.20)
+                        : c.borderHi)
+                  : c.border,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(
+                  alpha: theme.isDark ? 0.45 : 0.12,
+                ),
+                blurRadius: 32,
+                offset: const Offset(0, 12),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: c.red.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(Icons.warning_rounded, color: c.red, size: 18),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Extraction in Progress',
+                      style: TextStyle(
+                        color: c.textPri,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Closing now will cancel the current extraction. Are you sure?',
+                style: TextStyle(color: c.textSec, fontSize: 13, height: 1.5),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(
+                    child: MouseRegion(
+                      cursor: SystemMouseCursors.click,
+                      child: GestureDetector(
+                        onTap: () => Navigator.of(context).pop(false),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 11),
+                          decoration: BoxDecoration(
+                            color: c.surfaceHi,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: c.border),
+                          ),
+                          child: Center(
+                            child: Text(
+                              'Keep Running',
+                              style: TextStyle(
+                                color: c.textSec,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: MouseRegion(
+                      cursor: SystemMouseCursors.click,
+                      child: GestureDetector(
+                        onTap: () => Navigator.of(context).pop(true),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 11),
+                          decoration: BoxDecoration(
+                            color: c.red.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: c.red.withValues(alpha: 0.50),
+                            ),
+                          ),
+                          child: Center(
+                            child: Text(
+                              'Close Anyway',
+                              style: TextStyle(
+                                color: c.red,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    return result ?? false;
   }
 
   // Settings dialog
@@ -625,6 +774,7 @@ class _HomeScreenState extends State<HomeScreen>
       _endTimeCtrl.text = preset.endTime;
     });
     _validateTimeRange();
+    _refreshEstimates();
     Navigator.of(context).pop();
     final c = AppTheme.of(context).colors;
     _toast(
@@ -1006,7 +1156,10 @@ class _HomeScreenState extends State<HomeScreen>
               divisions: AppConstants.maxFps - AppConstants.minFps,
               color: c.accent,
               disabled: disabled,
-              onChanged: (v) => setState(() => _fps = v.toInt()),
+              onChanged: (v) {
+                setState(() => _fps = v.toInt());
+                _refreshEstimates();
+              },
             ),
             _Divider(c: c, isGlass: theme.isGlass, isDark: theme.isDark),
             _SliderRow(
@@ -1019,7 +1172,10 @@ class _HomeScreenState extends State<HomeScreen>
               divisions: 99,
               color: c.green,
               disabled: disabled,
-              onChanged: (v) => setState(() => _quality = v.toInt()),
+              onChanged: (v) {
+                setState(() => _quality = v.toInt());
+                _refreshEstimates();
+              },
             ),
             _Divider(c: c, isGlass: theme.isGlass, isDark: theme.isDark),
             Padding(
@@ -1048,7 +1204,10 @@ class _HomeScreenState extends State<HomeScreen>
                             disabled: disabled,
                             onTap: disabled
                                 ? null
-                                : () => setState(() => _format = fmt),
+                                : () {
+                                    setState(() => _format = fmt);
+                                    _refreshEstimates();
+                                  },
                             isGlass: theme.isGlass,
                             isDark: theme.isDark,
                           ),
@@ -1081,7 +1240,10 @@ class _HomeScreenState extends State<HomeScreen>
             max: AppConstants.maxScale,
             divisions: 19,
             color: c.orange,
-            onChanged: (v) => setState(() => _scale = v),
+            onChanged: (v) {
+              setState(() => _scale = v);
+              _refreshEstimates();
+            },
           ),
           _Divider(c: c, isGlass: theme.isGlass, isDark: theme.isDark),
           Padding(
@@ -1102,7 +1264,10 @@ class _HomeScreenState extends State<HomeScreen>
                   c: c,
                   initialValue: _framePrefix,
                   hint: 'frame_',
-                  onChanged: (v) => _framePrefix = v,
+                  onChanged: (v) {
+                    _framePrefix = v;
+                    _refreshEstimates();
+                  },
                   isGlass: theme.isGlass,
                   isDark: theme.isDark,
                 ),
@@ -1199,7 +1364,9 @@ class _HomeScreenState extends State<HomeScreen>
   Widget _buildAdvancedToggle(AppTheme theme, {required bool disabled}) {
     final c = theme.colors;
     return Opacity(
-      opacity: GlassTokens.disabledOpacity(isGlass: theme.isGlass),
+      opacity: disabled
+          ? GlassTokens.disabledOpacity(isGlass: theme.isGlass)
+          : 1.0,
       child: MouseRegion(
         cursor: disabled ? SystemMouseCursors.basic : SystemMouseCursors.click,
         child: GestureDetector(
@@ -1671,6 +1838,12 @@ class _HomeScreenState extends State<HomeScreen>
 
   // State change handler
   void _onStateChange(BuildContext context, ExtractionState state) {
+    if (state is ExtractionInProgress && !_pulseCtrl.isAnimating) {
+      _pulseCtrl.repeat(reverse: true);
+    } else if (state is! ExtractionInProgress && _pulseCtrl.isAnimating) {
+      _pulseCtrl.stop();
+      _pulseCtrl.reset();
+    }
     final c = AppTheme.of(context).colors;
     if (state is ExtractionSuccess) {
       _toast(state.message, c.green, c.greenDim, Icons.check_circle_rounded);
@@ -1730,6 +1903,7 @@ class _HomeScreenState extends State<HomeScreen>
         _videoPath = path;
         _recentVideos = AppPrefs.recentVideos;
       });
+      _refreshEstimates();
     }
   }
 
@@ -1738,6 +1912,7 @@ class _HomeScreenState extends State<HomeScreen>
     if (r != null) {
       await AppPrefs.setLastOutputDir(r);
       setState(() => _outputDirectory = r);
+      _refreshEstimates();
     }
   }
 
@@ -1748,7 +1923,7 @@ class _HomeScreenState extends State<HomeScreen>
       _ytInfoLoading = true;
       _ytInfo = null;
     });
-    final svc = YouTubeService();
+    final svc = context.read<ExtractionBloc>().youTubeService;
     final c = AppTheme.of(context).colors;
     final info = await svc.getVideoInfo(url);
     setState(() {
@@ -1817,7 +1992,6 @@ class _HomeScreenState extends State<HomeScreen>
   }
 }
 
-// ThemedDialogWrapper
 class _ThemedDialogWrapper extends StatelessWidget {
   final BuildContext parentContext;
   final Widget Function(AppTheme) builder;
@@ -1828,17 +2002,11 @@ class _ThemedDialogWrapper extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListenableBuilder(
-      listenable: _AppThemeNotifier.of(parentContext),
-      builder: (_, _) {
-        final liveTheme = AppTheme.of(parentContext);
-        return builder(liveTheme);
-      },
-    );
+    final liveTheme = AppTheme.of(parentContext);
+    return builder(liveTheme);
   }
 }
 
-// ThemedSheetWrapper
 class _ThemedSheetWrapper extends StatelessWidget {
   final BuildContext parentContext;
   final Widget Function(AppTheme) builder;
@@ -1849,53 +2017,9 @@ class _ThemedSheetWrapper extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListenableBuilder(
-      listenable: _AppThemeNotifier.of(parentContext),
-      builder: (_, _) {
-        final liveTheme = AppTheme.of(parentContext);
-        return _GlassSheet(theme: liveTheme, child: builder(liveTheme));
-      },
-    );
+    final liveTheme = AppTheme.of(parentContext);
+    return _GlassSheet(theme: liveTheme, child: builder(liveTheme));
   }
-}
-
-// AppThemeNotifier
-class _AppThemeNotifier extends ChangeNotifier {
-  static _AppThemeNotifier? _instance;
-  static _AppThemeNotifier of(BuildContext context) =>
-      _instance ??= _AppThemeNotifier._();
-  _AppThemeNotifier._();
-  void notify() => notifyListeners();
-}
-
-class _LiveThemeChild extends StatefulWidget {
-  final BuildContext parentContext;
-  final Widget Function(AppTheme) builder;
-  const _LiveThemeChild({required this.parentContext, required this.builder});
-  @override
-  State<_LiveThemeChild> createState() => _LiveThemeChildState();
-}
-
-class _LiveThemeChildState extends State<_LiveThemeChild> {
-  late AppTheme _theme;
-  @override
-  void initState() {
-    super.initState();
-    _theme = AppTheme.of(widget.parentContext);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _update());
-  }
-
-  void _update() {
-    if (!mounted) return;
-    final newTheme = AppTheme.of(widget.parentContext);
-    if (newTheme.isDark != _theme.isDark || newTheme.style != _theme.style) {
-      setState(() => _theme = newTheme);
-    }
-    Future.delayed(const Duration(milliseconds: 100), _update);
-  }
-
-  @override
-  Widget build(BuildContext context) => widget.builder(_theme);
 }
 
 // GlassBg
@@ -2119,11 +2243,10 @@ class _SettingsContent extends StatelessWidget {
   const _SettingsContent({required this.parentContext});
 
   @override
-  Widget build(BuildContext context) => _LiveThemeChild(
-    parentContext: parentContext,
-    builder: (liveTheme) =>
-        _SettingsBody(theme: liveTheme, parentContext: parentContext),
-  );
+  Widget build(BuildContext context) {
+    final liveTheme = AppTheme.of(parentContext);
+    return _SettingsBody(theme: liveTheme, parentContext: parentContext);
+  }
 }
 
 class _SettingsBody extends StatelessWidget {
@@ -2273,6 +2396,7 @@ class _SettingsBody extends StatelessWidget {
                     _ShortcutRow(c: c, key_: 'Esc', label: 'Cancel extraction'),
                     _ShortcutRow(c: c, key_: 'Ctrl+L', label: 'Open log panel'),
                     _ShortcutRow(c: c, key_: 'Ctrl+S', label: 'Open settings panel'),
+                    _ShortcutRow(c: c, key_: 'Ctrl+P', label: 'Open presets panel'),
                   ],
                 ),
               ),
@@ -2507,15 +2631,15 @@ class _PresetsContent extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) => _LiveThemeChild(
-    parentContext: parentContext,
-    builder: (liveTheme) => _PresetsBody(
+  Widget build(BuildContext context) {
+    final liveTheme = AppTheme.of(parentContext);
+    return _PresetsBody(
       theme: liveTheme,
       currentParams: currentParams,
       onApply: onApply,
       parentContext: parentContext,
-    ),
-  );
+    );
+  }
 }
 
 class _PresetsBody extends StatefulWidget {
@@ -2796,10 +2920,10 @@ class _LogContent extends StatelessWidget {
   const _LogContent({required this.logs, required this.parentContext});
 
   @override
-  Widget build(BuildContext context) => _LiveThemeChild(
-    parentContext: parentContext,
-    builder: (liveTheme) => _LogBody(logs: logs, theme: liveTheme),
-  );
+  Widget build(BuildContext context) {
+    final liveTheme = AppTheme.of(parentContext);
+    return _LogBody(logs: logs, theme: liveTheme);
+  }
 }
 
 class _LogBody extends StatelessWidget {
@@ -3337,99 +3461,109 @@ class _FileRowState extends State<_FileRow> {
         : widget.placeholder;
     final eff = widget.disabled ? widget.c.textMuted : widget.accent;
 
-    return MouseRegion(
-      cursor: widget.disabled
-          ? SystemMouseCursors.basic
-          : SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _hov = true),
-      onExit: (_) => setState(() => _hov = false),
-      child: InkWell(
-        onTap: widget.onTap,
-        borderRadius: BorderRadius.circular(18),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          decoration: BoxDecoration(
-            color: (!widget.disabled && _hov)
-                ? (widget.isGlass
-                      ? Colors.white.withValues(
-                          alpha: widget.isDark ? 0.06 : 0.18,
-                        )
-                      : widget.c.borderHi.withValues(alpha: 0.5))
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(18),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-            child: Row(
-              children: [
-                Container(
-                  width: 34,
-                  height: 34,
-                  decoration: BoxDecoration(
-                    color: eff.withValues(alpha: widget.disabled ? 0.05 : 0.14),
-                    borderRadius: BorderRadius.circular(9),
+    return Tooltip(
+      message: hasValue ? widget.value! : '',
+      waitDuration: const Duration(milliseconds: 600),
+      child: MouseRegion(
+        cursor: widget.disabled
+            ? SystemMouseCursors.basic
+            : SystemMouseCursors.click,
+        onEnter: (_) => setState(() => _hov = true),
+        onExit: (_) => setState(() => _hov = false),
+        child: InkWell(
+          onTap: widget.onTap,
+          borderRadius: BorderRadius.circular(18),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 120),
+            decoration: BoxDecoration(
+              color: (!widget.disabled && _hov)
+                  ? (widget.isGlass
+                        ? Colors.white.withValues(
+                            alpha: widget.isDark ? 0.06 : 0.18,
+                          )
+                        : widget.c.borderHi.withValues(alpha: 0.5))
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+              child: Row(
+                children: [
+                  Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: eff.withValues(
+                        alpha: widget.disabled ? 0.05 : 0.14,
+                      ),
+                      borderRadius: BorderRadius.circular(9),
+                    ),
+                    child: Icon(widget.icon, color: eff, size: 17),
                   ),
-                  child: Icon(widget.icon, color: eff, size: 17),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        widget.label,
-                        style: TextStyle(
-                          color: widget.isGlass
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.label,
+                          style: TextStyle(
+                            color: widget.isGlass
+                                ? (widget.isDark
+                                      ? Colors.white.withValues(alpha: 0.38)
+                                      : widget.c.textSec)
+                                : widget.c.textSec,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.4,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: hasValue
+                                ? (widget.isGlass
+                                      ? (widget.isDark
+                                            ? Colors.white.withValues(
+                                                alpha: 0.88,
+                                              )
+                                            : widget.c.textPri)
+                                      : widget.c.textPri)
+                                : (widget.isGlass
+                                      ? (widget.isDark
+                                            ? Colors.white.withValues(
+                                                alpha: 0.28,
+                                              )
+                                            : widget.c.textMuted)
+                                      : widget.c.textMuted),
+                            fontSize: 13,
+                            fontWeight: hasValue
+                                ? FontWeight.w500
+                                : FontWeight.w400,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Icon(
+                    hasValue
+                        ? Icons.check_circle_rounded
+                        : Icons.add_circle_outline_rounded,
+                    color: hasValue
+                        ? eff
+                        : (widget.isGlass
                               ? (widget.isDark
-                                    ? Colors.white.withValues(alpha: 0.38)
-                                    : widget.c.textSec)
-                              : widget.c.textSec,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 0.4,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: hasValue
-                              ? (widget.isGlass
-                                    ? (widget.isDark
-                                          ? Colors.white.withValues(alpha: 0.88)
-                                          : widget.c.textPri)
-                                    : widget.c.textPri)
-                              : (widget.isGlass
-                                    ? (widget.isDark
-                                          ? Colors.white.withValues(alpha: 0.28)
-                                          : widget.c.textMuted)
-                                    : widget.c.textMuted),
-                          fontSize: 13,
-                          fontWeight: hasValue
-                              ? FontWeight.w500
-                              : FontWeight.w400,
-                        ),
-                      ),
-                    ],
+                                    ? Colors.white.withValues(alpha: 0.20)
+                                    : widget.c.textMuted)
+                              : widget.c.textMuted),
+                    size: 18,
                   ),
-                ),
-                const SizedBox(width: 8),
-                Icon(
-                  hasValue
-                      ? Icons.check_circle_rounded
-                      : Icons.add_circle_outline_rounded,
-                  color: hasValue
-                      ? eff
-                      : (widget.isGlass
-                            ? (widget.isDark
-                                  ? Colors.white.withValues(alpha: 0.20)
-                                  : widget.c.textMuted)
-                            : widget.c.textMuted),
-                  size: 18,
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -4298,8 +4432,8 @@ class _UpdateBadgeState extends State<_UpdateBadge>
   Widget build(BuildContext context) {
     final orange = widget.c.orange;
     final tip = widget.version != null
-        ? 'v${widget.version} Available - Click to download'
-        : 'New version available - Click to download';
+        ? 'v${widget.version} Available — Click to download'
+        : 'New version available — Click to download';
 
     return Tooltip(
       message: tip,
@@ -4335,7 +4469,9 @@ class _UpdateBadgeState extends State<_UpdateBadge>
                   Icon(Icons.arrow_circle_up_rounded, color: orange, size: 10),
                   const SizedBox(width: 4),
                   Text(
-                    'out-of-date',
+                    widget.version != null
+                        ? 'v\${widget.version} available'
+                        : 'Update available',
                     style: TextStyle(
                       color: orange,
                       fontSize: 10,
