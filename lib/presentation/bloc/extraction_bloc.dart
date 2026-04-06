@@ -9,6 +9,7 @@ import 'package:frameextractor/data/services/youtube_service.dart';
 import 'package:frameextractor/presentation/bloc/extraction_event.dart';
 import 'package:frameextractor/presentation/bloc/extraction_state.dart';
 
+// TODO: Multi range extraction (params & bloc)
 class ExtractionBloc extends Bloc<ExtractionEvent, ExtractionState> {
   final FFmpegService ffmpegService;
   final YouTubeService youTubeService;

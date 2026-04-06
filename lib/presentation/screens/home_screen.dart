@@ -30,6 +30,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
+// TODO: drag & drop support, add export log into file, optimize home screen to reduce the line code
 class _HomeScreenState extends State<HomeScreen>
     with SingleTickerProviderStateMixin {
   // Controllers

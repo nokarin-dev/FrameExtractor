@@ -3,6 +3,7 @@ import 'package:frameextractor/data/models/extraction_present.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:frameextractor/core/app_constants.dart';
 
+// TODO: extraction history
 class AppPrefs {
   AppPrefs._();
   static late SharedPreferences _prefs;

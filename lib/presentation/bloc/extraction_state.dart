@@ -22,8 +22,3 @@ class ExtractionFailure extends ExtractionState {
 }
 
 class ExtractionCancelled extends ExtractionState {}
-
-/// Carries accumulated log lines across all states
-mixin LogMixin on ExtractionState {
-  List<String> get logs;
-}
