@@ -42,11 +42,11 @@ Head to the [**Releases**](https://github.com/nokarin-dev/frameextractor/release
 | Platform            | File                                    | Notes                                                       |
 |---------------------|-----------------------------------------|-------------------------------------------------------------|
 | 🪟 Windows          | `FrameExtractor-windows-installer.zip`  | Installation for windows                                    |
-| 🪟 Windows Portable | `FrameExtractor-windows-portable.zip`   | No installation needed                                      |
+| 🪟 Windows Portable | `FrameExtractor-windows-portable.zip`   | No installation needed (Portable)                           |
 | 🐧 Linux Debian     | `FrameExtractor-linux-installer.deb`    | Installation for debian (Ubuntu, Linux mint, etc)           |
 | 🐧 Linux RPM        | `FrameExtractor-linux-installer.rpm`    | Installation for rpm (Fedora, RHEL, etc)                    |
-| 🐧 Linux Portable   | `FrameExtractor-linux-portable.tar.gz`  | No installation needed                                      |
-| 🐧 Linux            | `FrameExtractor-linux.AppImage`         | No installation needed                                      |
+| 🐧 Linux Portable   | `FrameExtractor-linux-portable.tar.gz`  | No installation needed (Portable)                           |
+| 🐧 Linux            | `FrameExtractor-linux.AppImage`         | No installation needed (Portable)                           |
 | 🤖 Android          | `FrameExtractor-android-arm32.apk`      | Enable "Install unknown apps" in settings (For older phone) |
 | 🤖 Android          | `FrameExtractor-android-arm64.apk`      | Enable "Install unknown apps" in settings                   |
 | 🤖 Android          | `FrameExtractor-android-x86_64.apk`     | Emulators / Chromebooks                                     |
