@@ -1,8 +1,8 @@
 import 'package:frameextractor/core/app_constants.dart';
 import 'package:frameextractor/data/models/extraction_params.dart';
 import 'package:frameextractor/data/models/extraction_progress.dart';
+import 'package:frameextractor/data/models/video_metadata.dart';
 
-// Abstract interface
 abstract class FFmpegService {
   Future<bool> isFFmpegAvailable();
 
@@ -12,6 +12,13 @@ abstract class FFmpegService {
     required ExtractionParams params,
     void Function(ExtractionProgress)? onProgress,
     void Function(String)? onLog,
+  });
+
+  Future<VideoMetadata?> getVideoMetadata(String videoPath);
+
+  Future<String?> extractPreviewFrame({
+    required String videoPath,
+    required String timestamp,
   });
 
   Future<void> cancelExtraction();

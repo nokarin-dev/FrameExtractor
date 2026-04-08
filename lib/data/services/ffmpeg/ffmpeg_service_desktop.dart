@@ -5,28 +5,148 @@ import 'package:frameextractor/core/app_constants.dart';
 import 'package:frameextractor/core/binary_manager.dart';
 import 'package:frameextractor/data/models/extraction_params.dart';
 import 'package:frameextractor/data/models/extraction_progress.dart';
+import 'package:frameextractor/data/models/video_metadata.dart';
 import 'package:frameextractor/data/services/ffmpeg/ffmpeg_service_base.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as p;
 
 // Desktop implementation (Windows / Linux)
 class FFmpegServiceDesktop extends FFmpegService {
   Process? _activeProcess;
 
-  String get _bin => BinaryManager.instance.ffmpegPath!;
+  String get _ffmpeg => BinaryManager.instance.ffmpegPath!;
 
   @override
   Future<bool> isFFmpegAvailable() async {
     try {
-      final r = await Process.run(_bin, ['-version']);
+      final r = await Process.run(_ffmpeg, ['-version']);
       return r.exitCode == 0;
     } catch (_) {
       return false;
     }
   }
 
+  // Metadata
+  @override
+  Future<VideoMetadata?> getVideoMetadata(String videoPath) async {
+    try {
+      final result = await Process.run(_ffmpeg, ['-i', videoPath]);
+      final stderr = result.stderr as String;
+
+      Duration duration = Duration.zero;
+      final durMatch = RegExp(
+        r'Duration:\s+(\d+):(\d+):(\d+)\.(\d+)',
+      ).firstMatch(stderr);
+      if (durMatch != null) {
+        duration = Duration(
+          hours: int.parse(durMatch.group(1)!),
+          minutes: int.parse(durMatch.group(2)!),
+          seconds: int.parse(durMatch.group(3)!),
+          milliseconds: int.parse(
+            durMatch.group(4)!.padRight(3, '0').substring(0, 3),
+          ),
+        );
+      }
+
+      int w = 0, h = 0;
+      double fps = 0;
+      String codec = 'unknown';
+      final vidMatch = RegExp(
+        r'Video:\s+(\w+).*?(\d{3,5})x(\d{3,5}).*?([\d.]+)\s+fps',
+      ).firstMatch(stderr);
+      if (vidMatch != null) {
+        codec = vidMatch.group(1)!;
+        w = int.tryParse(vidMatch.group(2)!) ?? 0;
+        h = int.tryParse(vidMatch.group(3)!) ?? 0;
+        fps = double.tryParse(vidMatch.group(4)!) ?? 0;
+      }
+
+      final thumbPath = await _generateThumbnail(videoPath);
+
+      return VideoMetadata(
+        duration: duration,
+        width: w,
+        height: h,
+        fps: fps,
+        codec: codec,
+        thumbnailPath: thumbPath,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<String?> _generateThumbnail(String videoPath) async {
+    try {
+      final tempDir = await getTemporaryDirectory();
+      final thumbPath = p.join(
+        tempDir.path,
+        'thumb_${videoPath.hashCode.abs()}.jpg',
+      );
+      if (File(thumbPath).existsSync()) return thumbPath;
+
+      final result = await Process.run(_ffmpeg, [
+        '-y',
+        '-ss',
+        '00:00:01',
+        '-i',
+        videoPath,
+        '-vframes',
+        '1',
+        '-q:v',
+        '3',
+        '-vf',
+        'scale=320:-1',
+        thumbPath,
+      ]);
+
+      return result.exitCode == 0 && File(thumbPath).existsSync()
+          ? thumbPath
+          : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // Preview frame
+  @override
+  Future<String?> extractPreviewFrame({
+    required String videoPath,
+    required String timestamp,
+  }) async {
+    try {
+      final tempDir = await getTemporaryDirectory();
+      final outPath = p.join(
+        tempDir.path,
+        'preview_${videoPath.hashCode.abs()}_${timestamp.replaceAll(':', '-')}.jpg',
+      );
+
+      final result = await Process.run(_ffmpeg, [
+        '-y',
+        '-ss',
+        timestamp,
+        '-i',
+        videoPath,
+        '-vframes',
+        '1',
+        '-q:v',
+        '3',
+        outPath,
+      ]);
+
+      if (result.exitCode == 0 && await File(outPath).exists()) return outPath;
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // Estimate
   @override
   ({int frames, Duration time}) estimateExtraction(ExtractionParams params) =>
       estimateExtractionImpl(params);
 
+  // Extract frame
   @override
   Future<bool> extractFrames({
     required ExtractionParams params,
@@ -35,7 +155,7 @@ class FFmpegServiceDesktop extends FFmpegService {
   }) async {
     final errors = params.validate();
     if (errors.isNotEmpty) {
-      onLog?.call('[ERROR] Validation failed:\n${errors.join('\n')}');
+      onLog?.call('[ERR] Validation failed:\n${errors.join('\n')}');
       onProgress?.call(
         ExtractionProgress(
           message: 'Invalid parameters: ${errors.first}',
@@ -54,7 +174,7 @@ class FFmpegServiceDesktop extends FFmpegService {
 
     final vf = buildVfFilter(params);
     final qv = qualityToQv(params.imageQuality);
-    final threads = AppConstants.ffmpegThreads; // 0 = auto
+    final threads = AppConstants.ffmpegThreads;
 
     final args = [
       '-y',
@@ -74,10 +194,10 @@ class FFmpegServiceDesktop extends FFmpegService {
       out,
     ];
 
-    onLog?.call('$_bin ${args.join(' ')}');
+    onLog?.call('$_ffmpeg ${args.join(' ')}');
 
     try {
-      _activeProcess = await Process.start(_bin, args);
+      _activeProcess = await Process.start(_ffmpeg, args);
 
       var frames = 0;
       var lastEmit = DateTime.now();
@@ -147,14 +267,14 @@ class FFmpegServiceDesktop extends FFmpegService {
       }
     } on ProcessException catch (e) {
       _activeProcess = null;
-      onLog?.call('[ERROR] ProcessException: ${e.message}');
+      onLog?.call('[ERR] ProcessException: ${e.message}');
       onProgress?.call(
         ExtractionProgress(message: 'Error: ${e.message}', percentage: 0),
       );
       return false;
     } catch (e) {
       _activeProcess = null;
-      onLog?.call('[ERROR] Unexpected: $e');
+      onLog?.call('[ERR] Unexpected: $e');
       onProgress?.call(
         ExtractionProgress(message: 'Unexpected error: $e', percentage: 0),
       );

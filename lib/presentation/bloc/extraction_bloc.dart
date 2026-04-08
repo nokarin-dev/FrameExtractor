@@ -3,13 +3,14 @@ import 'dart:io';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:frameextractor/core/android_path_helper.dart';
 import 'package:frameextractor/core/app_prefs.dart';
+import 'package:frameextractor/data/models/extraction_params.dart';
 import 'package:frameextractor/data/models/extraction_progress.dart';
+import 'package:frameextractor/data/models/extraction_record.dart';
 import 'package:frameextractor/data/services/ffmpeg/ffmpeg_service_base.dart';
 import 'package:frameextractor/data/services/youtube_service.dart';
 import 'package:frameextractor/presentation/bloc/extraction_event.dart';
 import 'package:frameextractor/presentation/bloc/extraction_state.dart';
 
-// TODO: Multi range extraction (params & bloc)
 class ExtractionBloc extends Bloc<ExtractionEvent, ExtractionState> {
   final FFmpegService ffmpegService;
   final YouTubeService youTubeService;
@@ -21,9 +22,12 @@ class ExtractionBloc extends Bloc<ExtractionEvent, ExtractionState> {
     : super(ExtractionInitial()) {
     on<StartExtraction>(_onStartExtraction);
     on<StartYouTubeExtraction>(_onStartYouTubeExtraction);
+    on<StartBatchExtraction>(_onStartBatchExtraction);
     on<CancelExtraction>(_onCancelExtraction);
     on<UpdateProgress>(_onUpdateProgress);
     on<AppendLog>(_onAppendLog);
+    on<SavePreset>(_onSavePreset);
+    on<DeletePreset>(_onDeletePreset);
   }
 
   // Local file extraction
@@ -38,41 +42,30 @@ class ExtractionBloc extends Bloc<ExtractionEvent, ExtractionState> {
       ),
     );
 
-    await _persistSettings(
-      event.params.fps,
-      event.params.format,
-      event.params.imageQuality,
-      event.params.resolutionScale,
-      event.params.startTime,
-      event.params.endTime,
-      event.params.frameNamePrefix,
-    );
+    await _persistSettings(event.params);
 
     final videoPath = await AndroidPathHelper.resolveVideoPath(
       event.params.videoPath,
     );
-
-    final userOutputUri = event.params.outputDirectory;
-    _logs.add('[DEBUG] raw outputDirectory: $userOutputUri');
+    _log('Video: $videoPath');
 
     final String ffmpegOutputDir;
     if (Platform.isAndroid) {
       ffmpegOutputDir = await AndroidPathHelper.getWritableOutputDir();
-      _logs.add('[Android] ffmpeg output → $ffmpegOutputDir');
+      _log('[Android] ffmpeg output → $ffmpegOutputDir');
     } else {
       ffmpegOutputDir = await AndroidPathHelper.resolveOutputDirectory(
-        userOutputUri,
+        event.params.outputDirectory,
       );
     }
-
-    _logs.add('Video: $videoPath');
-    _logs.add('Output: $ffmpegOutputDir');
+    _log('Output: $ffmpegOutputDir');
 
     final params = event.params.copyWith(
       videoPath: videoPath,
       outputDirectory: ffmpegOutputDir,
     );
 
+    final started = DateTime.now();
     final success = await ffmpegService.extractFrames(
       params: params,
       onProgress: (p) {
@@ -83,23 +76,36 @@ class ExtractionBloc extends Bloc<ExtractionEvent, ExtractionState> {
 
     if (isClosed) return;
 
+    final userOutputUri = event.params.outputDirectory;
+
     if (success) {
       if (Platform.isAndroid && AndroidPathHelper.isSafUri(userOutputUri)) {
         await _copyFramesToUserDir(
           emit: emit,
           tempDir: ffmpegOutputDir,
           targetUri: userOutputUri,
+          started: started,
+          params: params,
         );
         return;
       }
+      final frameCount = _countFramesIn(ffmpegOutputDir, params.format);
+      await _saveHistoryRecord(
+        params: params,
+        started: started,
+        frameCount: frameCount,
+      );
       emit(
         ExtractionSuccess(
           'Extraction completed successfully',
           outputDirectory: ffmpegOutputDir,
+          frameCount: frameCount,
         ),
       );
     } else {
-      emit(ExtractionFailure('Extraction failed. Check logs for details.'));
+      emit(
+        const ExtractionFailure('Extraction failed. Check logs for details.'),
+      );
     }
   }
 
@@ -109,18 +115,14 @@ class ExtractionBloc extends Bloc<ExtractionEvent, ExtractionState> {
     Emitter<ExtractionState> emit,
   ) async {
     _logs.clear();
-
     youTubeService.resetCancelFlag();
 
     final userOutputUri = event.params.outputDirectory;
-    _logs.add('[DEBUG] raw outputDirectory: $userOutputUri');
-    _logs.add('[DEBUG] isAndroid: ${Platform.isAndroid}');
-    _logs.add('[DEBUG] isSafUri: ${AndroidPathHelper.isSafUri(userOutputUri)}');
 
     final String ffmpegOutputDir;
     if (Platform.isAndroid) {
       ffmpegOutputDir = await AndroidPathHelper.getWritableOutputDir();
-      _logs.add('[Android] ffmpeg output → $ffmpegOutputDir');
+      _log('[Android] ffmpeg output → $ffmpegOutputDir');
     } else {
       ffmpegOutputDir = await AndroidPathHelper.resolveOutputDirectory(
         userOutputUri,
@@ -152,7 +154,7 @@ class ExtractionBloc extends Bloc<ExtractionEvent, ExtractionState> {
     if (isClosed) return;
 
     if (videoPath == null) {
-      emit(ExtractionFailure('YouTube download failed. Check logs.'));
+      emit(const ExtractionFailure('YouTube download failed. Check logs.'));
       return;
     }
 
@@ -173,6 +175,7 @@ class ExtractionBloc extends Bloc<ExtractionEvent, ExtractionState> {
       videoPath: videoPath,
       outputDirectory: ffmpegOutputDir,
     );
+    final started = DateTime.now();
 
     final success = await ffmpegService.extractFrames(
       params: params,
@@ -184,7 +187,6 @@ class ExtractionBloc extends Bloc<ExtractionEvent, ExtractionState> {
 
     if (isClosed) return;
 
-    // Delete the downloaded video
     await _deleteFile(videoPath);
 
     if (success) {
@@ -193,24 +195,138 @@ class ExtractionBloc extends Bloc<ExtractionEvent, ExtractionState> {
           emit: emit,
           tempDir: ffmpegOutputDir,
           targetUri: userOutputUri,
+          started: started,
+          params: params,
         );
         return;
       }
+      final frameCount = _countFramesIn(ffmpegOutputDir, params.format);
+      await _saveHistoryRecord(
+        params: params,
+        started: started,
+        frameCount: frameCount,
+      );
       emit(
         ExtractionSuccess(
           'YouTube extraction completed!',
           outputDirectory: ffmpegOutputDir,
+          frameCount: frameCount,
         ),
       );
     } else {
-      emit(ExtractionFailure('Frame extraction failed. Check logs.'));
+      emit(const ExtractionFailure('Frame extraction failed. Check logs.'));
     }
+  }
+
+  // Batch
+  Future<void> _onStartBatchExtraction(
+    StartBatchExtraction event,
+    Emitter<ExtractionState> emit,
+  ) async {
+    _logs.clear();
+
+    final jobs = event.paramsList;
+    if (jobs.isEmpty) {
+      emit(const ExtractionFailure('Batch list is empty.'));
+      return;
+    }
+
+    int totalFrames = 0;
+    String lastOutputDir = '';
+
+    for (var i = 0; i < jobs.length; i++) {
+      if (isClosed) return;
+
+      final jobParams = jobs[i];
+      _log(
+        '[Batch] Job ${i + 1}/${jobs.length}: ${jobParams.startTime} → ${jobParams.endTime}',
+      );
+
+      final videoPath = await AndroidPathHelper.resolveVideoPath(
+        jobParams.videoPath,
+      );
+      final String ffmpegOutputDir;
+      if (Platform.isAndroid) {
+        ffmpegOutputDir = await AndroidPathHelper.getWritableOutputDir();
+      } else {
+        ffmpegOutputDir = await AndroidPathHelper.resolveOutputDirectory(
+          jobParams.outputDirectory,
+        );
+      }
+
+      final params = jobParams.copyWith(
+        videoPath: videoPath,
+        outputDirectory: ffmpegOutputDir,
+      );
+
+      emit(
+        ExtractionInProgress(
+          ExtractionProgress(
+            message: 'Batch ${i + 1}/${jobs.length}: extracting…',
+            percentage: 0,
+          ),
+          phase: 'batch',
+          batchIndex: i,
+          batchTotal: jobs.length,
+        ),
+      );
+
+      final started = DateTime.now();
+      final success = await ffmpegService.extractFrames(
+        params: params,
+        onProgress: (p) {
+          if (p.percentage < 100) {
+            add(
+              UpdateProgress(
+                ExtractionProgress(
+                  message: 'Batch ${i + 1}/${jobs.length}: ${p.message}',
+                  percentage: p.percentage,
+                  framesProcessed: p.framesProcessed,
+                  estimatedFrames: p.estimatedFrames,
+                  timeElapsed: p.timeElapsed,
+                  timeRemaining: p.timeRemaining,
+                ),
+              ),
+            );
+          }
+        },
+        onLog: (line) => add(AppendLog(line)),
+      );
+
+      if (isClosed) return;
+
+      if (!success) {
+        emit(ExtractionFailure('Batch job ${i + 1} failed. Check logs.'));
+        return;
+      }
+
+      final frameCount = _countFramesIn(ffmpegOutputDir, params.format);
+      totalFrames += frameCount;
+      lastOutputDir = ffmpegOutputDir;
+
+      await _saveHistoryRecord(
+        params: params,
+        started: started,
+        frameCount: frameCount,
+      );
+      await _persistSettings(params);
+    }
+
+    emit(
+      ExtractionSuccess(
+        'Batch complete! $totalFrames frames across ${jobs.length} jobs.',
+        outputDirectory: lastOutputDir,
+        frameCount: totalFrames,
+      ),
+    );
   }
 
   Future<void> _copyFramesToUserDir({
     required Emitter<ExtractionState> emit,
     required String tempDir,
     required String targetUri,
+    required DateTime started,
+    required ExtractionParams params,
   }) async {
     final allFiles = Directory(tempDir).listSync().whereType<File>().where((f) {
       final ext = f.path.split('.').last.toLowerCase();
@@ -218,45 +334,64 @@ class ExtractionBloc extends Bloc<ExtractionEvent, ExtractionState> {
     }).toList()..sort((a, b) => a.path.compareTo(b.path));
 
     final frameCount = allFiles.length;
-    _logs.add('[Frames] $frameCount extracted in $tempDir');
+    _log('[Frames] $frameCount extracted in $tempDir');
 
     if (frameCount == 0) {
-      emit(ExtractionFailure('No frames were produced. Check logs.'));
+      emit(const ExtractionFailure('No frames were produced. Check logs.'));
       return;
     }
 
     if (AndroidPathHelper.isSafUri(targetUri)) {
+      if (isClosed) return;
       emit(
         ExtractionInProgress(
           ExtractionProgress(
             message: 'Copying $frameCount frames…',
             percentage: 99,
           ),
-          phase: 'extracting',
+          phase: 'copying',
         ),
       );
+
+      if (isClosed) return;
       final copied = await AndroidPathHelper.copyFramesToUri(
         tempOutputDir: tempDir,
         targetUri: targetUri,
       );
+
+      if (isClosed) return;
+
       for (final f in allFiles) {
         try {
           await f.delete();
         } catch (_) {}
       }
+
       if (copied > 0) {
+        await _saveHistoryRecord(
+          params: params,
+          started: started,
+          frameCount: copied,
+        );
         emit(
           ExtractionSuccess(
             'Done! $copied frames copied to your chosen folder.',
             outputDirectory: targetUri,
+            frameCount: copied,
           ),
         );
       } else {
-        _logs.add('[WARN] SAF copy failed. Frames kept in app dir.');
+        _log('[WARN] SAF copy failed. Frames kept in app dir.');
+        await _saveHistoryRecord(
+          params: params,
+          started: started,
+          frameCount: frameCount,
+        );
         emit(
           ExtractionSuccess(
             'Done! $frameCount frames in:\nAndroid/data/com.nokarin.frameextractor/files/',
             outputDirectory: tempDir,
+            frameCount: frameCount,
           ),
         );
       }
@@ -264,11 +399,13 @@ class ExtractionBloc extends Bloc<ExtractionEvent, ExtractionState> {
     }
 
     try {
+      if (isClosed) return;
       final destDir = Directory(targetUri);
       await destDir.create(recursive: true);
       var copied = 0;
       for (final f in allFiles) {
-        final dest = File('\${destDir.path}/\${f.uri.pathSegments.last}');
+        if (isClosed) return;
+        final dest = File('${destDir.path}/${f.uri.pathSegments.last}');
         await f.copy(dest.path);
         copied++;
       }
@@ -277,15 +414,26 @@ class ExtractionBloc extends Bloc<ExtractionEvent, ExtractionState> {
           await f.delete();
         } catch (_) {}
       }
-      _logs.add('[Copy] $copied frames → $targetUri');
+      _log('[Copy] $copied frames → $targetUri');
+      await _saveHistoryRecord(
+        params: params,
+        started: started,
+        frameCount: copied,
+      );
       emit(
         ExtractionSuccess(
           'Done! $copied frames saved.',
           outputDirectory: targetUri,
+          frameCount: copied,
         ),
       );
     } catch (e) {
-      _logs.add('[INFO] Cannot write to $targetUri: $e');
+      _log('[INFO] Cannot write to $targetUri: $e');
+      await _saveHistoryRecord(
+        params: params,
+        started: started,
+        frameCount: frameCount,
+      );
       emit(
         ExtractionSuccess(
           'Done! $frameCount frames saved to:\n'
@@ -293,6 +441,7 @@ class ExtractionBloc extends Bloc<ExtractionEvent, ExtractionState> {
           'Access via Files app → Internal Storage → Android → data '
           '→ com.nokarin.frameextractor → files',
           outputDirectory: tempDir,
+          frameCount: frameCount,
         ),
       );
     }
@@ -305,39 +454,89 @@ class ExtractionBloc extends Bloc<ExtractionEvent, ExtractionState> {
   ) async {
     await ffmpegService.cancelExtraction();
     await youTubeService.cancelDownload();
-    _logs.add('[Cancelled by user]');
-    emit(ExtractionCancelled());
+    _log('[Cancelled by user]');
+    emit(const ExtractionCancelled());
   }
 
+  // Logs
   void _onUpdateProgress(UpdateProgress event, Emitter<ExtractionState> emit) {
     if (state is! ExtractionInProgress) return;
-    final phase = (state as ExtractionInProgress).phase;
-    emit(ExtractionInProgress(event.progress, phase: phase));
+    final current = state as ExtractionInProgress;
+    emit(
+      ExtractionInProgress(
+        event.progress,
+        phase: current.phase,
+        batchIndex: current.batchIndex,
+        batchTotal: current.batchTotal,
+      ),
+    );
   }
 
   void _onAppendLog(AppendLog event, Emitter<ExtractionState> emit) {
-    _logs.add(event.line);
+    if (event.level == LogLevel.debug) {
+      _logs.add('[DEBUG] ${event.line}');
+    } else {
+      _logs.add(event.line);
+    }
+  }
+
+  // Presets
+  Future<void> _onSavePreset(
+    SavePreset event,
+    Emitter<ExtractionState> emit,
+  ) async {
+    await AppPrefs.savePreset(event.preset);
+  }
+
+  Future<void> _onDeletePreset(
+    DeletePreset event,
+    Emitter<ExtractionState> emit,
+  ) async {
+    await AppPrefs.deletePreset(event.presetId);
   }
 
   // Helpers
-  Future<void> _persistSettings(
-    int fps,
-    String format,
-    int quality,
-    double scale,
-    String startTime,
-    String endTime,
-    String prefix,
-  ) async {
+  Future<void> _persistSettings(ExtractionParams p) async {
     await Future.wait([
-      AppPrefs.setLastFps(fps),
-      AppPrefs.setLastFormat(format),
-      AppPrefs.setLastQuality(quality),
-      AppPrefs.setLastScale(scale),
-      AppPrefs.setLastStartTime(startTime),
-      AppPrefs.setLastEndTime(endTime),
-      AppPrefs.setLastPrefix(prefix),
+      AppPrefs.setLastFps(p.fps),
+      AppPrefs.setLastFormat(p.format),
+      AppPrefs.setLastQuality(p.imageQuality),
+      AppPrefs.setLastScale(p.resolutionScale),
+      AppPrefs.setLastStartTime(p.startTime),
+      AppPrefs.setLastEndTime(p.endTime),
+      AppPrefs.setLastPrefix(p.frameNamePrefix),
     ]);
+  }
+
+  int _countFramesIn(String dir, String format) {
+    try {
+      return Directory(dir)
+          .listSync()
+          .whereType<File>()
+          .where((f) => f.path.toLowerCase().endsWith('.$format'))
+          .length;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  Future<void> _saveHistoryRecord({
+    required ExtractionParams params,
+    required DateTime started,
+    required int frameCount,
+  }) async {
+    await AppPrefs.addHistoryRecord(
+      ExtractionRecord(
+        id: 'rec_${DateTime.now().millisecondsSinceEpoch}',
+        videoPath: params.videoPath,
+        outputDirectory: params.outputDirectory,
+        frameCount: frameCount,
+        completedAt: DateTime.now(),
+        elapsed: DateTime.now().difference(started),
+        format: params.format,
+        fps: params.fps,
+      ),
+    );
   }
 
   Future<void> _deleteFile(String path) async {
@@ -345,9 +544,11 @@ class ExtractionBloc extends Bloc<ExtractionEvent, ExtractionState> {
       final file = File(path);
       if (await file.exists()) await file.delete();
     } catch (e) {
-      _logs.add('[WARN] Could not delete $path: $e');
+      _log('[WARN] Could not delete $path: $e');
     }
   }
+
+  void _log(String line) => _logs.add(line);
 
   @override
   Future<void> close() {

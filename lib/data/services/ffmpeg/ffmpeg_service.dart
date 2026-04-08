@@ -5,7 +5,7 @@ import 'package:frameextractor/data/services/ffmpeg/ffmpeg_service_desktop.dart'
 import 'package:frameextractor/data/services/ffmpeg/ffmpeg_service_mobile.dart';
 
 FFmpegService createFFmpegService() {
-  if (Platform.isAndroid || Platform.isIOS) {
+  if (Platform.isAndroid) {
     return FFmpegServiceMobile();
   }
   return FFmpegServiceDesktop();

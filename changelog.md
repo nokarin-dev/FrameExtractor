@@ -7,6 +7,7 @@ This project loosely follows Keep a Changelog and uses Semantic Versioning.
 ---
 
 ## [Unreleased]
+
 ### Added
 #### Core
 - **Preset System** - Save, browse, and apply named extraction presets (FPS, format, quality, scale, time range, prefix). Built-in presets included: High Quality PNG, Fast Preview, Web Optimized, 4K Lossless
@@ -14,6 +15,27 @@ This project loosely follows Keep a Changelog and uses Semantic Versioning.
 - **Frame & Size Estimator** - Live frame count and estimated output size shown below settings when a source and output folder are selected
 - **Keyboard shortcut Ctrl+P** - Opens the Presets panel
 - **Close confirmation dialog** - Closing the window while extraction is in progress now shows a confirmation dialog ("Keep Running" / "Close Anyway") instead of immediately terminating the process
+- **Batch extraction** - define multiple time ranges (each with its own frame prefix) and extract all of them in a single run. A new `StartBatchExtraction` event drives the `ExtractionBloc`, which reports per-job progress (e.g. "Job 2/5: extracting…") and saves a separate history record for every completed job.
+- **Extraction history** - every successful extraction is automatically saved to `AppPrefs` (max 50 records). The new History screen (title bar button or `Ctrl+H`) shows video name, frame count, elapsed time, fps, format, and the output path, with one-click "Open folder" and "Copy path" actions.
+- **Video metadata card** - after selecting a local video the app runs `ffmpeg` (desktop) or `FFprobeKit` (Android) to read duration, resolution, fps, and codec, then renders a thumbnail alongside these details below the source card. The thumbnail is cached in the system temp directory so subsequent opens are instant.
+- **Frame preview screen** - tap the thumbnail (or the preview button) to open a full-screen scrubber that renders the frame at any timestamp before committing to a full extraction. Uses `ffmpeg -vframes 1` under the hood; the preview is cached per-path-and-timestamp.
+- **Drag & drop video files** (desktop) - drag any supported video file directly onto the app window using the `desktop_drop` package. Unsupported extensions show a toast error.
+- **Keyboard shortcut `Ctrl+H`** - opens the History panel; added to the Settings keyboard shortcuts list.
+
+#### Bloc / Events
+- `StartBatchExtraction` event - list of `ExtractionParams`, each run in sequence; first failure aborts the batch.
+- `SavePreset` and `DeletePreset` events now have working handlers in `ExtractionBloc` (previously defined in `extraction_event.dart` but silently ignored because no `on<SavePreset>` / `on<DeletePreset>` handlers were registered).
+- `LogLevel` enum (`debug`, `info`, `warn`, `error`) on `AppendLog` - debug-level lines are stored in the log buffer but tagged `[DEBUG]` so they are visually grouped; future work can filter them out of the panel.
+
+#### Services
+- `FFmpegService.getVideoMetadata(String videoPath)` - new abstract method implemented in both `FFmpegServiceDesktop` (ffmpeg) and `FFmpegServiceMobile` (FFprobeKit).
+- `FFmpegService.extractPreviewFrame({required String videoPath, required String timestamp})` - renders a single JPEG to the temp directory; cached by path + timestamp.
+
+#### Models
+- `VideoMetadata` - new model: `duration`, `width`, `height`, `fps`, `codec`, `thumbnailPath`. Helpers: `resolutionLabel`, `durationFormatted`.
+- `ExtractionRecord` - new model for history: full JSON serialization round-trips via `listFromJson` / `listToJson`. Fields: `id`, `videoPath`, `outputDirectory`,`frameCount`, `completedAt`, `elapsed`, `format`, `fps`. Helper: `videoName`.
+- `ExtractionSuccess` now carries `frameCount` (previously always 0), which is used when persisting the history record.
+- `ExtractionInProgress` now carries `batchIndex` and `batchTotal` for batch progress UI. Helper getter `isBatch`.
 
 #### Validation
 - **Time range validation** - Start/End time fields now validate in real-time: incorrect format (non-HH:MM:SS), start ≥ end, and range < 0.1s are flagged with inline error messages. Fields turn red and extraction is blocked until fixed
@@ -36,14 +58,18 @@ This project loosely follows Keep a Changelog and uses Semantic Versioning.
 #### AppPrefs
 - `lastFps`, `lastFormat`, `lastQuality`, `lastScale`, `lastStartTime`, `lastEndTime`, `lastPrefix`, `openFolderOnDone` - persisted extraction settings
 - `customPresets`, `allPresets`, `savePreset()`, `deletePreset()`, `clearCustomPresets()` - full preset CRUD
+- `addHistoryRecord()`, `history` getter, `clearHistory()` - history CRUD backed by `prefHistory` key.
 
 #### AppConstants
 - `prefLastFps`, `prefLastFormat`, `prefLastQuality`, `prefLastScale`, `prefLastStartTime`, `prefLastEndTime`, `prefLastPrefix`, `prefOpenFolderOnDone`, `prefPresets` - new preference keys
-- `ffmpegThreads` constant (defaults to `0` = auto)
+  - `ffmpegThreads` constant (defaults to `0` = auto)
 - `maxCustomPresets` limit (20)
 - Expanded `supportedVideoExtensions`: added `ts`, `3gp`
 - `maxFps` raised from 60 → 120
 - `minScale` lowered from 0.25 → 0.1, `maxScale` raised from 2.0 → 4.0
+- `maxHistoryRecords` constant (50).
+- `prefHistory` preference key.
+-
 
 #### User Interface
 - **Presets panel** accessible via new title bar button (bookmarks icon) or Ctrl+P
@@ -52,12 +78,24 @@ This project loosely follows Keep a Changelog and uses Semantic Versioning.
 - **Save as Preset** button inside Advanced settings panel
 - **Estimate row** below settings card: shows `~N frames` and `~X MB` live as user adjusts FPS, format, quality, and time range
 - **Pulse animation** for progress indicator now correctly starts/stops based on actual extraction state (was always running before)
-- **Full path tooltip** on Video File and Output Folder rows — hovering shows the complete file/directory path, not just the truncated filename
+- **Full path tooltip** on Video File and Output Folder rows - hovering shows the complete file/directory path, not just the truncated filename
+- **History screen** - full-screen list of past extractions. Each tile shows video name, date, frame count, elapsed time, fps, format, and output path. "Clear all" with confirmation dialog. Works on desktop and Android (folder-open disabled on mobile).
+- **VideoMetadataCard widget** - thumbnail + resolution + duration + codec + fps chips. Tapping opens FramePreviewScreen.
+- **FramePreviewScreen** - scrubber slider (0–3600 s), timestamp label, refresh button, pinch-to-zoom via `InteractiveViewer`. Loading spinner and "could not extract" error state.
+- History button (clock icon) in title bar; `Ctrl+H` shortcut.
+- ProgressSection now shows a "Job N of M" indicator during batch runs and renders a `BATCH` phase label.
 - Time field error state: red border, red icon, red label, red tinted background, inline error text below field
 - Presets keyboard shortcut `Ctrl+P` row added to Settings panel
 - Update badge label changed from generic "out-of-date" to the specific version string (e.g. "v1.2.0 available")
 
 ### Fixed
+#### Core
+- **`SavePreset` / `DeletePreset` silently dropped** - the bloc now has `on<SavePreset>` and `on<DeletePreset>` handlers that call `AppPrefs.savePreset()` / `AppPrefs.deletePreset()`. Previously, dispatching these events did nothing.
+- **`LogMixin` dead code removed** from `extraction_state.dart` - the mixin was defined but never mixed into any state class. Log state is correctly managed on the bloc itself as `_logs`.
+- **`_parseSeconds` duplicated** in `home_screen.dart` and `extraction_params.dart` - both copies are replaced by a single top-level `parseTimeString(String t)` function exported from `extraction_params.dart`. The UI import is `show parseTimeString` to keep the namespace clean.
+- **`isClosed` guards missing** inside `_copyFramesToUserDir` - every `await` in the copy loop and SAF path is now preceded by an `if (isClosed) return` guard, preventing state emissions after the bloc is disposed.
+- **`[DEBUG]` log strings in user-visible panel** - bloc internal diagnostic lines are now emitted via `AppendLog(line, level: LogLevel.debug)` and stored with a `[DEBUG]` prefix. They appear in the log buffer (for export) but are visually distinguished from user-facing `[INFO]` / `[WARN]` / `[ERR]` lines.
+
 #### YouTube Service
 - **Cancel flag not reset** - `YouTubeService._cancelled` was never reset to `false` before starting a new download, causing the first download after a cancellation to immediately return `null`. Fixed via new `resetCancelFlag()` method called by `ExtractionBloc` before each download
 - **YouTubeService recreated on every fetch** - `_fetchYtInfo()` was instantiating a new `YouTubeService()` on each button press. It now reuses the instance owned by `ExtractionBloc`, avoiding redundant allocations and potential state inconsistency
@@ -83,8 +121,13 @@ This project loosely follows Keep a Changelog and uses Semantic Versioning.
 - `ExtractionBloc` persists settings to `AppPrefs` after each successful extraction start via `_persistSettings()`
 - `HomeScreen._loadPrefs()` now restores all persisted extraction settings on init, and filters stale recent video entries asynchronously
 - `_validateTimeRange()` wired to `_onTimeChanged()` listener which also triggers `_refreshEstimates()`, keeping estimate display in sync with time field edits
+- `HomeScreen` split into focused files under `presentation/screens/sections/`: `source_section.dart`, `output_section.dart`, `settings_section.dart`, `advanced_section.dart`, `progress_section.dart`. The root `home_screen.dart` is now a thin orchestrator (~400 lines vs ~1 200 before).
+- Shared UI primitives extracted to `presentation/widgets/`: `app_card.dart`, `app_divider.dart`, `clear_row.dart`, `compact_field.dart`, `disabled_overlay.dart`, `file_row.dart`, `gloss_chip.dart`, `slider_row.dart`, `small_btn.dart`, `time_field.dart`, `video_metadata_card.dart`.
+- `isGlass` and `isDark` are no longer prop-drilled through every widget constructor. All extracted widgets call `AppTheme.of(context)` directly, relying on Flutter's `InheritedWidget` mechanism.
+- `ExtractionBloc._persistSettings` refactored to accept `ExtractionParams` instead of seven individual parameters.
 
 ---
+
 ## [1.1.3] - 2026-04-02
 ### Added
 #### Core
@@ -104,6 +147,7 @@ This project loosely follows Keep a Changelog and uses Semantic Versioning.
 - Log Body not expandable now on mobile
 
 ## [1.1.2] - 2026-03-26
+
 ### Fixed
 #### CI/CD
 - Fixed Linux AppImage launch error `Is a directory` - `$EXE_NAME` was set in CI shell but not expanded inside the AppRun heredoc (single-quoted heredoc prevents variable substitution). AppRun now detects the executable at runtime using `find`
@@ -111,16 +155,16 @@ This project loosely follows Keep a Changelog and uses Semantic Versioning.
 ### Added
 #### Core
 - Style Switcher
-    - Classic Style (Default)
-    - Liquid Glass Style (EXPERIMENTAL)
+  - Classic Style (Default)
+  - Liquid Glass Style (EXPERIMENTAL)
 - Theme Switcher
-    - Dark Theme
-    - Light Theme
+  - Dark Theme
+  - Light Theme
 - Keyboard Shortcut
-    - Space (Extract)
-    - Esc (Cancel Extraction)
-    - Ctrl+L (Open Log Panel)
-    - Ctrl+S (Open Settings Panel)
+  - Space (Extract)
+  - Esc (Cancel Extraction)
+  - Ctrl+L (Open Log Panel)
+  - Ctrl+S (Open Settings Panel)
 - Application Icons
 
 ### Changed
@@ -132,6 +176,7 @@ This project loosely follows Keep a Changelog and uses Semantic Versioning.
 - Splash Screen now following current theme & style
 
 ## [1.1.1] - 2026-03-22
+
 ### Fixed
 #### Android
 - Frame extraction now works correctly - ffmpeg output is written to the app's writable directory (`Android/data/com.nokarin.frameextractor/files/`) instead of trying to write directly to `/storage/emulated/0/` which is blocked by Android 10+ Scoped Storage
@@ -160,7 +205,6 @@ This project loosely follows Keep a Changelog and uses Semantic Versioning.
 - Default quality changed from 100% to 90%
 - "Open folder when done" toggle now has a subtitle description
 
-
 ### Changed
 #### UI
 - Progress card is now shown/hidden dynamically instead of always visible
@@ -168,6 +212,7 @@ This project loosely follows Keep a Changelog and uses Semantic Versioning.
 - Comment style in source code simplified (no decorative separator lines)
 
 ## [1.1.0] - 2026-03-21
+
 ### Added
 #### Core Features
 - Extract frames from local video files with precise start/end time control
@@ -234,10 +279,10 @@ ffmpeg and yt-dlp are bundled inside the app.
 
 On first launch, required binaries are extracted to:
 - Installer:
-    - Windows: `%AppData%\FrameExtractor\bin\`
-    - Linux: `~/.local/share/FrameExtractor/bin/`
+  - Windows: `%AppData%\FrameExtractor\bin\`
+  - Linux: `~/.local/share/FrameExtractor/bin/`
 - Portable:
-    - `bin/` folder next to the executable
+  - `bin/` folder next to the executable
 
 ---
 

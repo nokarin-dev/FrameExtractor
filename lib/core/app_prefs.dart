@@ -1,9 +1,9 @@
 import 'dart:convert';
 import 'package:frameextractor/data/models/extraction_present.dart';
+import 'package:frameextractor/data/models/extraction_record.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:frameextractor/core/app_constants.dart';
 
-// TODO: extraction history
 class AppPrefs {
   AppPrefs._();
   static late SharedPreferences _prefs;
@@ -128,4 +128,23 @@ class AppPrefs {
 
   static Future<void> clearCustomPresets() =>
       _prefs.remove(AppConstants.prefPresets);
+
+  // Extraction history
+  static List<ExtractionRecord> get history {
+    final raw = _prefs.getString(AppConstants.prefHistory);
+    if (raw == null || raw.isEmpty) return [];
+    return ExtractionRecord.listFromJson(raw);
+  }
+
+  static Future<void> addHistoryRecord(ExtractionRecord record) async {
+    final list = history.where((r) => r.id != record.id).toList();
+    list.insert(0, record);
+    if (list.length > AppConstants.maxHistoryRecords) list.removeLast();
+    await _prefs.setString(
+      AppConstants.prefHistory,
+      ExtractionRecord.listToJson(list),
+    );
+  }
+
+  static Future<void> clearHistory() => _prefs.remove(AppConstants.prefHistory);
 }

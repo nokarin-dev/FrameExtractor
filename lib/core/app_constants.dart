@@ -42,6 +42,7 @@ class AppConstants {
   static const String prefLastOutput = 'last_output_dir';
   static const String prefRecentVideos = 'recent_videos';
   static const String prefPresets = 'extraction_presets';
+  static const String prefHistory = 'extraction_history';
 
   // Extraction settings
   static const String prefLastFps = 'last_fps';
@@ -55,6 +56,7 @@ class AppConstants {
 
   static const int maxRecentVideos = 8;
   static const int maxCustomPresets = 20;
+  static const int maxHistoryRecords = 20;
 
   // Processing speed estimates
   static const double desktopSpeed = 150.0;

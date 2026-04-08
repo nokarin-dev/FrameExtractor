@@ -13,6 +13,11 @@ SOURCES = {
             "type":  "zip",
             "inner": "ffmpeg-master-latest-win64-gpl/bin/ffmpeg.exe",
         },
+        "ffprobe.exe": {
+            "url":   "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip",
+            "type":  "zip",
+            "inner": "ffmpeg-master-latest-win64-gpl/bin/ffprobe.exe",
+        },
         "yt-dlp.exe": {
             "url":  "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe",
             "type": "raw",
@@ -24,19 +29,13 @@ SOURCES = {
             "type":  "tar.xz",
             "inner": "ffmpeg-master-latest-linux64-gpl/bin/ffmpeg",
         },
+        "ffprobe": {
+            "url":   "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz",
+            "type":  "tar.xz",
+            "inner": "ffmpeg-master-latest-linux64-gpl/bin/ffprobe",
+        },
         "yt-dlp": {
             "url":  "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux",
-            "type": "raw",
-        },
-    },
-    "macos": {
-        "ffmpeg": {
-            "url":   "https://evermeet.cx/ffmpeg/getrelease/ffmpeg/zip",
-            "type":  "zip",
-            "inner": "ffmpeg",
-        },
-        "yt-dlp": {
-            "url":  "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos",
             "type": "raw",
         },
     },
@@ -95,7 +94,7 @@ def stage(plat, filename, spec):
     print(f"  ✓  {dest}  ({dest.stat().st_size//1024} KB)")
 
     if plat.startswith("android/") and filename.endswith(".so"):
-        abi = plat.split("/")[1]  # arm64-v8a, armeabi-v7a, x86_64
+        abi = plat.split("/")[1] # arm64-v8a, armeabi-v7a, x86_64
         jni_dest = JNILIBS_DIR / abi / filename
         jni_dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(dest, jni_dest)
@@ -103,7 +102,7 @@ def stage(plat, filename, spec):
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("--platform", nargs="+", choices=["windows","linux","macos","android","all"])
+    p.add_argument("--platform", nargs="+", choices=["windows","linux","android","all"])
     p.add_argument("--all", action="store_true")
     args = p.parse_args()
     if not args.platform and not args.all: p.print_help(); sys.exit(1)

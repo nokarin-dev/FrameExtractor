@@ -16,40 +16,38 @@ class BinaryManager {
     return _ytDlpPath!;
   }
 
-  bool get isInitialized =>
-      _ytDlpPath != null || Platform.isAndroid || Platform.isIOS;
+  bool get isInitialized => _ytDlpPath != null || Platform.isAndroid;
 
   Future<void> initialize({bool isPortable = false}) async {
-    if (Platform.isAndroid || Platform.isIOS) return;
+    if (Platform.isAndroid) return;
     _initDesktop();
   }
 
-  void _initDesktop() {
+  void _initDesktop({bool isPortable = false}) {
+    final String binDir;
+
     if (kDebugMode) {
       final platform = _platformFolder();
-      final assetBinDir = p.join(
-        Directory.current.path,
-        'assets',
-        'binaries',
-        platform,
-      );
-      _ffmpegPath = p.join(assetBinDir, _exeName('ffmpeg'));
-      _ytDlpPath = p.join(assetBinDir, _exeName('yt-dlp'));
+      binDir = p.join(Directory.current.path, 'assets', 'binaries', platform);
+    } else if (isPortable) {
+      binDir = p.join(File(Platform.resolvedExecutable).parent.path, 'bin');
     } else {
-      final exeDir = File(Platform.resolvedExecutable).parent.path;
-      final binDir = p.join(exeDir, 'bin');
-      _ffmpegPath = p.join(binDir, _exeName('ffmpeg'));
-      _ytDlpPath = p.join(binDir, _exeName('yt-dlp'));
+      binDir = p.join(File(Platform.resolvedExecutable).parent.path, 'bin');
     }
+
+    _ffmpegPath = p.join(binDir, _exeName('ffmpeg'));
+    _ytDlpPath = p.join(binDir, _exeName('yt-dlp'));
   }
 
   Future<({bool ffmpeg, bool ytDlp})> selfTest() async {
-    if (Platform.isAndroid || Platform.isIOS) {
+    if (Platform.isAndroid) {
       return (ffmpeg: true, ytDlp: true);
     }
-    final ff = await _check(_ffmpegPath!, ['-version']);
+
+    final ffm = await _check(_ffmpegPath!, ['-version']);
     final yt = await _check(_ytDlpPath!, ['--version']);
-    return (ffmpeg: ff, ytDlp: yt);
+
+    return (ffmpeg: ffm, ytDlp: yt);
   }
 
   Future<bool> _check(String bin, List<String> args) async {
@@ -67,7 +65,6 @@ class BinaryManager {
   String _platformFolder() {
     if (Platform.isWindows) return 'windows';
     if (Platform.isLinux) return 'linux';
-    if (Platform.isMacOS) return 'macos';
     throw UnsupportedError('Unsupported: ${Platform.operatingSystem}');
   }
 

@@ -1,4 +1,5 @@
-// TODO: Multi range extraction (params & bloc)
+import 'package:frameextractor/core/app_constants.dart';
+
 class ExtractionParams {
   final String videoPath;
   final String outputDirectory;
@@ -22,55 +23,47 @@ class ExtractionParams {
     this.resolutionScale = 1.0,
   });
 
-  // Validate all fields
+  // Validation
   List<String> validate() {
     final errors = <String>[];
 
-    if (videoPath.trim().isEmpty) {
-      errors.add('Video path is required.');
-    }
-
+    if (videoPath.trim().isEmpty) errors.add('Video path is required.');
     if (outputDirectory.trim().isEmpty) {
       errors.add('Output directory is required.');
     }
 
-    final startSec = _parseSeconds(startTime);
-    final endSec = _parseSeconds(endTime);
+    final startSec = parseTimeString(startTime);
+    final endSec = parseTimeString(endTime);
 
     if (startSec == null) {
       errors.add('Start time format is invalid. Use HH:MM:SS.');
     }
-    if (endSec == null) {
-      errors.add('End time format is invalid. Use HH:MM:SS.');
-    }
+    if (endSec == null) errors.add('End time format is invalid. Use HH:MM:SS.');
     if (startSec != null && endSec != null) {
-      if (startSec >= endSec) {
-        errors.add('Start time must be before end time.');
-      }
+      if (startSec >= endSec) errors.add('Start time must be before end time.');
       if ((endSec - startSec) < 0.1) {
-        errors.add('Time range is too short (minimum 0.1 seconds).');
+        errors.add('Time range is too short (minimum 0.1 s).');
       }
     }
 
-    if (fps < 1 || fps > 120) {
-      errors.add('FPS must be between 1 and 120.');
+    if (fps < AppConstants.minFps || fps > AppConstants.maxFps) {
+      errors.add(
+        'FPS must be between ${AppConstants.minFps} and ${AppConstants.maxFps}.',
+      );
     }
-
     if (imageQuality < 1 || imageQuality > 100) {
       errors.add('Image quality must be between 1 and 100.');
     }
-
-    if (resolutionScale < 0.1 || resolutionScale > 4.0) {
-      errors.add('Resolution scale must be between 0.1 and 4.0.');
+    if (resolutionScale < AppConstants.minScale ||
+        resolutionScale > AppConstants.maxScale) {
+      errors.add(
+        'Resolution scale must be between ${AppConstants.minScale} and ${AppConstants.maxScale}.',
+      );
     }
-
     if (frameNamePrefix.trim().isEmpty) {
       errors.add('Frame name prefix cannot be empty.');
     }
-
-    // Check for illegal characters
-    final illegalChars = RegExp(r'[<>:"/\\|?*]');
-    if (illegalChars.hasMatch(frameNamePrefix)) {
+    if (RegExp(r'[<>:"/\\|?*]').hasMatch(frameNamePrefix)) {
       errors.add('Frame prefix contains illegal characters.');
     }
 
@@ -108,15 +101,14 @@ class ExtractionParams {
     return params;
   }
 
-  /// Estimated output frame count.
+  // Estimate
   int get estimatedFrameCount {
-    final s = _parseSeconds(startTime) ?? 0;
-    final e = _parseSeconds(endTime) ?? 0;
+    final s = parseTimeString(startTime) ?? 0;
+    final e = parseTimeString(endTime) ?? 0;
     final dur = (e - s).clamp(0.0, double.infinity);
     return (dur * fps).round();
   }
 
-  // Estimated output size in bytes
   int get estimatedSizeBytes {
     final frames = estimatedFrameCount;
     final bytesPerFrame = switch (format) {
@@ -138,17 +130,7 @@ class ExtractionParams {
     return '${(bytes / 1024 / 1024 / 1024).toStringAsFixed(2)} GB';
   }
 
-  static double? _parseSeconds(String t) {
-    final parts = t.split(':');
-    if (parts.length != 3) return null;
-    final h = double.tryParse(parts[0]);
-    final m = double.tryParse(parts[1]);
-    final s = double.tryParse(parts[2]);
-    if (h == null || m == null || s == null) return null;
-    if (m >= 60 || s >= 60) return null;
-    return h * 3600 + m * 60 + s;
-  }
-
+  // Utilities
   ExtractionParams copyWith({
     String? videoPath,
     String? outputDirectory,
@@ -159,19 +141,17 @@ class ExtractionParams {
     String? format,
     int? imageQuality,
     double? resolutionScale,
-  }) {
-    return ExtractionParams(
-      videoPath: videoPath ?? this.videoPath,
-      outputDirectory: outputDirectory ?? this.outputDirectory,
-      startTime: startTime ?? this.startTime,
-      endTime: endTime ?? this.endTime,
-      fps: fps ?? this.fps,
-      frameNamePrefix: frameNamePrefix ?? this.frameNamePrefix,
-      format: format ?? this.format,
-      imageQuality: imageQuality ?? this.imageQuality,
-      resolutionScale: resolutionScale ?? this.resolutionScale,
-    );
-  }
+  }) => ExtractionParams(
+    videoPath: videoPath ?? this.videoPath,
+    outputDirectory: outputDirectory ?? this.outputDirectory,
+    startTime: startTime ?? this.startTime,
+    endTime: endTime ?? this.endTime,
+    fps: fps ?? this.fps,
+    frameNamePrefix: frameNamePrefix ?? this.frameNamePrefix,
+    format: format ?? this.format,
+    imageQuality: imageQuality ?? this.imageQuality,
+    resolutionScale: resolutionScale ?? this.resolutionScale,
+  );
 
   @override
   bool operator ==(Object other) =>
@@ -205,4 +185,15 @@ class ExtractionParams {
       'ExtractionParams(video: $videoPath, fps: $fps, format: $format, '
       'quality: $imageQuality%, scale: ${resolutionScale}x, '
       'range: $startTime → $endTime)';
+}
+
+double? parseTimeString(String t) {
+  final parts = t.split(':');
+  if (parts.length != 3) return null;
+  final h = double.tryParse(parts[0]);
+  final m = double.tryParse(parts[1]);
+  final s = double.tryParse(parts[2]);
+  if (h == null || m == null || s == null) return null;
+  if (m >= 60 || s >= 60) return null;
+  return h * 3600 + m * 60 + s;
 }

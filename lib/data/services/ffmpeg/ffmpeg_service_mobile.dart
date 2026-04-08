@@ -1,10 +1,16 @@
+import 'dart:io';
+
 import 'package:ffmpeg_kit_flutter_new/ffmpeg_kit.dart';
 import 'package:ffmpeg_kit_flutter_new/ffmpeg_kit_config.dart';
+import 'package:ffmpeg_kit_flutter_new/ffprobe_kit.dart';
 import 'package:ffmpeg_kit_flutter_new/return_code.dart';
 
 import 'package:frameextractor/data/models/extraction_params.dart';
 import 'package:frameextractor/data/models/extraction_progress.dart';
+import 'package:frameextractor/data/models/video_metadata.dart';
 import 'package:frameextractor/data/services/ffmpeg/ffmpeg_service_base.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as p;
 
 // Mobile implementation (Android)
 class FFmpegServiceMobile extends FFmpegService {
@@ -18,10 +24,93 @@ class FFmpegServiceMobile extends FFmpegService {
     }
   }
 
+  // Metadata
+  @override
+  Future<VideoMetadata?> getVideoMetadata(String videoPath) async {
+    try {
+      final session = await FFprobeKit.getMediaInformation(videoPath);
+      final info = session.getMediaInformation();
+      if (info == null) return null;
+
+      final streams = info.getStreams();
+      final videoStream = streams.firstWhere(
+        (s) => s.getType() == 'video',
+        orElse: () => streams.isEmpty ? streams.first : streams.first,
+      );
+
+      final durationSec = double.tryParse(info.getDuration() ?? '0') ?? 0;
+      final width =
+          int.tryParse(videoStream.getWidth()?.toString() ?? '0') ?? 0;
+      final height =
+          int.tryParse(videoStream.getHeight()?.toString() ?? '0') ?? 0;
+
+      double fps = 0;
+      final rateStr = videoStream.getRealFrameRate() ?? '';
+      final rateParts = rateStr.split('/');
+      if (rateParts.length == 2) {
+        final num = double.tryParse(rateParts[0]) ?? 0;
+        final den = double.tryParse(rateParts[1]) ?? 1;
+        if (den != 0) fps = num / den;
+      }
+
+      final tempDir = await getTemporaryDirectory();
+      final thumbPath = p.join(
+        tempDir.path,
+        'thumb_${videoPath.hashCode.abs()}.jpg',
+      );
+      final thumbFile = File(thumbPath);
+
+      if (!await thumbFile.exists()) {
+        await FFmpegKit.execute(
+          '-y -ss 00:00:01 -i "$videoPath" -vframes 1 -q:v 3 -vf scale=320:-1 "$thumbPath"',
+        );
+      }
+
+      return VideoMetadata(
+        duration: Duration(milliseconds: (durationSec * 1000).round()),
+        width: width,
+        height: height,
+        fps: fps,
+        codec: videoStream.getCodec() ?? 'unknown',
+        thumbnailPath: await thumbFile.exists() ? thumbPath : null,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // Preview frame
+  @override
+  Future<String?> extractPreviewFrame({
+    required String videoPath,
+    required String timestamp,
+  }) async {
+    try {
+      final tempDir = await getTemporaryDirectory();
+      final outPath = p.join(
+        tempDir.path,
+        'preview_${videoPath.hashCode.abs()}_${timestamp.replaceAll(':', '-')}.jpg',
+      );
+
+      final session = await FFmpegKit.execute(
+        '-y -ss $timestamp -i "$videoPath" -vframes 1 -q:v 3 "$outPath"',
+      );
+
+      final code = await session.getReturnCode();
+      if (ReturnCode.isSuccess(code) && await File(outPath).exists())
+        return outPath;
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // Estimate
   @override
   ({int frames, Duration time}) estimateExtraction(ExtractionParams params) =>
       estimateExtractionImpl(params);
 
+  // Extract frame
   @override
   Future<bool> extractFrames({
     required ExtractionParams params,
@@ -30,7 +119,7 @@ class FFmpegServiceMobile extends FFmpegService {
   }) async {
     final errors = params.validate();
     if (errors.isNotEmpty) {
-      onLog?.call('[ERROR] Validation failed:\n${errors.join('\n')}');
+      onLog?.call('[ERR] Validation failed:\n${errors.join('\n')}');
       onProgress?.call(
         ExtractionProgress(
           message: 'Invalid parameters: ${errors.first}',
@@ -94,7 +183,7 @@ class FFmpegServiceMobile extends FFmpegService {
 
     FFmpegKitConfig.enableLogCallback((log) => onLog?.call(log.getMessage()));
 
-    final session = await FFmpegKit.executeAsync(cmd, (completedSession) async {
+    await FFmpegKit.executeAsync(cmd, (completedSession) async {
       success = ReturnCode.isSuccess(await completedSession.getReturnCode());
       completed = true;
     });
@@ -119,7 +208,6 @@ class FFmpegServiceMobile extends FFmpegService {
         ),
       );
     } else {
-      final output = await session.getOutput();
       onProgress?.call(
         ExtractionProgress(
           message: 'FFmpeg failed',
@@ -127,7 +215,6 @@ class FFmpegServiceMobile extends FFmpegService {
           timeElapsed: total,
         ),
       );
-      onLog?.call('[ERROR] FFmpeg output: $output');
     }
 
     return success;

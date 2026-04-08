@@ -21,7 +21,7 @@ void main() async {
 
   await AppPrefs.init();
 
-  if (!Platform.isAndroid && !Platform.isIOS) {
+  if (!Platform.isAndroid) {
     await windowManager.ensureInitialized();
     await windowManager.waitUntilReadyToShow(
       const WindowOptions(
@@ -84,7 +84,6 @@ class _InitGateState extends State<_InitGate> {
 
   Future<void> _init() async {
     try {
-      if (!Platform.isIOS) {
         setState(() => _status = 'Extracting binaries…');
         await BinaryManager.instance.initialize(isPortable: kIsPortable);
 
@@ -100,7 +99,6 @@ class _InitGateState extends State<_InitGate> {
                 'yt-dlp: ${test.ytDlp ? "✓" : "✗"}';
           });
           return;
-        }
       }
 
       if (!mounted) return;
