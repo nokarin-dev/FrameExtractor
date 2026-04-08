@@ -97,8 +97,9 @@ class FFmpegServiceMobile extends FFmpegService {
       );
 
       final code = await session.getReturnCode();
-      if (ReturnCode.isSuccess(code) && await File(outPath).exists())
+      if (ReturnCode.isSuccess(code) && await File(outPath).exists()) {
         return outPath;
+      }
       return null;
     } catch (_) {
       return null;

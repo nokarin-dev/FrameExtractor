@@ -57,7 +57,7 @@ class ProgressSection extends StatelessWidget {
             children: [
               AnimatedBuilder(
                 animation: pulseAnim,
-                builder: (_, __) => Opacity(
+                builder: (_, _) => Opacity(
                   opacity: pulseAnim.value,
                   child: Container(
                     width: 7,

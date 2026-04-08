@@ -38,7 +38,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
   Widget build(BuildContext context) {
     final theme = AppTheme.of(context);
     final c = theme.colors;
-    final isGlass = theme.isGlass;
 
     return Scaffold(
       backgroundColor: c.bg,
@@ -94,7 +93,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
           : ListView.separated(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               itemCount: _records.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 8),
+              separatorBuilder: (_, _) => const SizedBox(height: 8),
               itemBuilder: (_, i) => _RecordTile(
                 record: _records[i],
                 theme: theme,

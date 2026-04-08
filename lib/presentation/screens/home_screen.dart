@@ -96,11 +96,15 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   String get _settingsHint {
-    if (_sourceMode == SourceMode.local && _videoPath == null)
+    if (_sourceMode == SourceMode.local && _videoPath == null) {
       return 'Select a video file first';
-    if (_outputDirectory == null) return 'Select an output folder first';
-    if (_sourceMode == SourceMode.youtube && _ytInfo == null)
+    }
+    if (_outputDirectory == null) {
+      return 'Select an output folder first';
+    }
+    if (_sourceMode == SourceMode.youtube && _ytInfo == null) {
       return 'Fetch a YouTube video first';
+    }
     return '';
   }
 
@@ -246,8 +250,9 @@ class _HomeScreenState extends State<HomeScreen>
 
     String? startErr, endErr;
 
-    if (start.isNotEmpty && !timePattern.hasMatch(start))
+    if (start.isNotEmpty && !timePattern.hasMatch(start)) {
       startErr = 'Use HH:MM:SS';
+    }
     if (end.isNotEmpty && !timePattern.hasMatch(end)) endErr = 'Use HH:MM:SS';
 
     if (startErr == null &&
@@ -256,8 +261,9 @@ class _HomeScreenState extends State<HomeScreen>
         end.isNotEmpty) {
       final s = parseTimeString(start);
       final e = parseTimeString(end);
-      if (s != null && e != null && s >= e)
+      if (s != null && e != null && s >= e) {
         startErr = 'Start must be before end';
+      }
     }
 
     if (startErr != _startTimeError || endErr != _endTimeError) {
@@ -361,8 +367,9 @@ class _HomeScreenState extends State<HomeScreen>
     final c = AppTheme.of(context).colors;
     if (state is ExtractionSuccess) {
       _toast(state.message, c.green, c.greenDim, Icons.check_circle_rounded);
-      if (_openFolderOnDone && state.outputDirectory.isNotEmpty)
+      if (_openFolderOnDone && state.outputDirectory.isNotEmpty) {
         _openFolder(state.outputDirectory);
+      }
     } else if (state is ExtractionFailure) {
       _toast(state.error, c.red, c.redDim, Icons.error_rounded);
     } else if (state is ExtractionCancelled) {
@@ -781,10 +788,11 @@ class _HomeScreenState extends State<HomeScreen>
                                       _videoMetadata = null;
                                     }),
                                     onYtInfoChanged: (info) {
-                                      if (info == null && _ytInfo == null)
+                                      if (info == null && _ytInfo == null) {
                                         _fetchYtInfo();
-                                      else
+                                      } else {
                                         setState(() => _ytInfo = info);
+                                      }
                                     },
                                     onYtQualityChanged: (q) =>
                                         setState(() => _ytQuality = q),

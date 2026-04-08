@@ -69,7 +69,6 @@ This project loosely follows Keep a Changelog and uses Semantic Versioning.
 - `minScale` lowered from 0.25 → 0.1, `maxScale` raised from 2.0 → 4.0
 - `maxHistoryRecords` constant (50).
 - `prefHistory` preference key.
--
 
 #### User Interface
 - **Presets panel** accessible via new title bar button (bookmarks icon) or Ctrl+P
@@ -121,7 +120,7 @@ This project loosely follows Keep a Changelog and uses Semantic Versioning.
 - `ExtractionBloc` persists settings to `AppPrefs` after each successful extraction start via `_persistSettings()`
 - `HomeScreen._loadPrefs()` now restores all persisted extraction settings on init, and filters stale recent video entries asynchronously
 - `_validateTimeRange()` wired to `_onTimeChanged()` listener which also triggers `_refreshEstimates()`, keeping estimate display in sync with time field edits
-- `HomeScreen` split into focused files under `presentation/screens/sections/`: `source_section.dart`, `output_section.dart`, `settings_section.dart`, `advanced_section.dart`, `progress_section.dart`. The root `home_screen.dart` is now a thin orchestrator (~400 lines vs ~1 200 before).
+- `HomeScreen` split into focused files under `presentation/screens/sections/`: `source_section.dart`, `output_section.dart`, `settings_section.dart`, `advanced_section.dart`, `progress_section.dart`. The root `home_screen.dart` is now a thin orchestrator.
 - Shared UI primitives extracted to `presentation/widgets/`: `app_card.dart`, `app_divider.dart`, `clear_row.dart`, `compact_field.dart`, `disabled_overlay.dart`, `file_row.dart`, `gloss_chip.dart`, `slider_row.dart`, `small_btn.dart`, `time_field.dart`, `video_metadata_card.dart`.
 - `isGlass` and `isDark` are no longer prop-drilled through every widget constructor. All extracted widgets call `AppTheme.of(context)` directly, relying on Flutter's `InheritedWidget` mechanism.
 - `ExtractionBloc._persistSettings` refactored to accept `ExtractionParams` instead of seven individual parameters.

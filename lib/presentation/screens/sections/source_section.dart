@@ -68,13 +68,6 @@ class _SourceSectionState extends State<SourceSection> {
     }
   }
 
-  Future<void> _fetchYtInfo() async {
-    final url = widget.ytUrlCtrl.text.trim();
-    if (url.isEmpty) return;
-    widget.onYtInfoChanged(null);
-    final svc = widget.ffmpegService;
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = AppTheme.of(context);
