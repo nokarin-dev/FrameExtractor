@@ -13,11 +13,6 @@ SOURCES = {
             "type":  "zip",
             "inner": "ffmpeg-master-latest-win64-gpl/bin/ffmpeg.exe",
         },
-        "ffprobe.exe": {
-            "url":   "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip",
-            "type":  "zip",
-            "inner": "ffmpeg-master-latest-win64-gpl/bin/ffprobe.exe",
-        },
         "yt-dlp.exe": {
             "url":  "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe",
             "type": "raw",
@@ -28,11 +23,6 @@ SOURCES = {
             "url":   "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz",
             "type":  "tar.xz",
             "inner": "ffmpeg-master-latest-linux64-gpl/bin/ffmpeg",
-        },
-        "ffprobe": {
-            "url":   "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz",
-            "type":  "tar.xz",
-            "inner": "ffmpeg-master-latest-linux64-gpl/bin/ffprobe",
         },
         "yt-dlp": {
             "url":  "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux",
