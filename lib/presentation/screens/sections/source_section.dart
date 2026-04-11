@@ -27,6 +27,7 @@ class SourceSection extends StatefulWidget {
   final List<String> recentVideos;
   final FFmpegService ffmpegService;
   final TextEditingController ytUrlCtrl;
+  final String lastFetchedUrl;
 
   final ValueChanged<SourceMode> onModeChanged;
   final ValueChanged<String> onVideoSelected;
@@ -47,6 +48,7 @@ class SourceSection extends StatefulWidget {
     required this.recentVideos,
     required this.ffmpegService,
     required this.ytUrlCtrl,
+    required this.lastFetchedUrl,
     required this.onModeChanged,
     required this.onVideoSelected,
     required this.onVideoClear,
@@ -155,6 +157,7 @@ class _SourceSectionState extends State<SourceSection> {
                   ctrl: widget.ytUrlCtrl,
                   loading: widget.ytInfoLoading,
                   disabled: widget.disabled,
+                  lastFetchedUrl: widget.lastFetchedUrl,
                   onFetch: () => widget.onYtInfoChanged(null),
                 ),
                 if (widget.ytInfo != null) ...[
@@ -308,23 +311,60 @@ class _Tab extends StatelessWidget {
   }
 }
 
-// YouTube widgets
-class _YouTubeInputRow extends StatelessWidget {
+class _YouTubeInputRow extends StatefulWidget {
   final AppTheme theme;
   final TextEditingController ctrl;
   final bool loading, disabled;
+  final String lastFetchedUrl;
   final VoidCallback onFetch;
   const _YouTubeInputRow({
     required this.theme,
     required this.ctrl,
     required this.loading,
     required this.disabled,
+    required this.lastFetchedUrl,
     required this.onFetch,
   });
 
   @override
+  State<_YouTubeInputRow> createState() => _YouTubeInputRowState();
+}
+
+class _YouTubeInputRowState extends State<_YouTubeInputRow> {
+  String _currentUrl = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _currentUrl = widget.ctrl.text.trim();
+    widget.ctrl.addListener(_onUrlChanged);
+  }
+
+  void _onUrlChanged() {
+    final trimmed = widget.ctrl.text.trim();
+    if (trimmed != _currentUrl) {
+      setState(() => _currentUrl = trimmed);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.ctrl.removeListener(_onUrlChanged);
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final c = theme.colors;
+    final c = widget.theme.colors;
+
+    final alreadyFetched =
+        _currentUrl.isNotEmpty && _currentUrl == widget.lastFetchedUrl;
+    final canFetch =
+        !widget.disabled &&
+        !widget.loading &&
+        !alreadyFetched &&
+        _currentUrl.isNotEmpty;
+
     return Padding(
       padding: const EdgeInsets.all(14),
       child: Row(
@@ -345,8 +385,8 @@ class _YouTubeInputRow extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(
             child: TextField(
-              controller: ctrl,
-              enabled: !disabled,
+              controller: widget.ctrl,
+              enabled: !widget.disabled,
               style: TextStyle(color: c.textPri, fontSize: 13),
               decoration: InputDecoration(
                 hintText: 'https://youtube.com/watch?v=…',
@@ -355,17 +395,19 @@ class _YouTubeInputRow extends StatelessWidget {
                 isDense: true,
                 contentPadding: EdgeInsets.zero,
               ),
-              onSubmitted: (_) => onFetch(),
+              onSubmitted: (_) {
+                if (canFetch) widget.onFetch();
+              },
             ),
           ),
           const SizedBox(width: 8),
           SmallBtn(
             c: c,
-            label: loading ? '…' : 'Fetch',
-            onTap: (disabled || loading) ? null : onFetch,
+            label: widget.loading ? '…' : 'Fetch',
+            onTap: canFetch ? widget.onFetch : null,
             color: c.accent,
-            isGlass: theme.isGlass,
-            isDark: theme.isDark,
+            isGlass: widget.theme.isGlass,
+            isDark: widget.theme.isDark,
           ),
         ],
       ),

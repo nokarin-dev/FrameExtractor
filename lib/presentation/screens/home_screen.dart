@@ -43,6 +43,8 @@ class _HomeScreenState extends State<HomeScreen>
   late AnimationController _pulseCtrl;
   late Animation<double> _pulseAnim;
 
+  final FocusNode _keyboardFocusNode = FocusNode();
+
   // Source state
   SourceMode _sourceMode = SourceMode.local;
   String? _videoPath;
@@ -65,6 +67,7 @@ class _HomeScreenState extends State<HomeScreen>
   YouTubeQuality _ytQuality = YouTubeQuality.p1080;
   bool _ytInfoLoading = false;
   YouTubeVideoInfo? _ytInfo;
+  String _lastFetchedUrl = '';
 
   // Misc
   List<String> _recentVideos = [];
@@ -126,16 +129,27 @@ class _HomeScreenState extends State<HomeScreen>
     UpdateService.resultNotifier.addListener(_onUpdateResult);
     _startTimeCtrl.addListener(_onTimeChanged);
     _endTimeCtrl.addListener(_onTimeChanged);
+    _ytUrlCtrl.addListener(_onYtUrlChanged);
   }
 
   @override
   void dispose() {
     UpdateService.resultNotifier.removeListener(_onUpdateResult);
     _pulseCtrl.dispose();
+    _keyboardFocusNode.dispose();
+    _ytUrlCtrl.removeListener(_onYtUrlChanged);
     _ytUrlCtrl.dispose();
     _startTimeCtrl.dispose();
     _endTimeCtrl.dispose();
     super.dispose();
+  }
+
+  void _onYtUrlChanged() {
+    if (_ytUrlCtrl.text.trim() != _lastFetchedUrl) {
+      if (_lastFetchedUrl.isNotEmpty) {
+        setState(() => _lastFetchedUrl = '');
+      }
+    }
   }
 
   // Prefs / init
@@ -207,6 +221,12 @@ class _HomeScreenState extends State<HomeScreen>
     setState(() {
       _ytInfo = info;
       _ytInfoLoading = false;
+
+      if (info != null) {
+        _lastFetchedUrl = url;
+      } else {
+        _lastFetchedUrl = '';
+      }
     });
     if (info == null) {
       _toast(
@@ -296,11 +316,12 @@ class _HomeScreenState extends State<HomeScreen>
     }
   }
 
-  // ── Extraction ────────────────────────────────────────────────────────────────
-
+  // Extraction
   void _startExtraction() {
+    final isYouTube = _sourceMode == SourceMode.youtube;
+
     final params = ExtractionParams(
-      videoPath: _videoPath ?? '',
+      videoPath: isYouTube ? '__youtube__' : (_videoPath ?? ''),
       outputDirectory: _outputDirectory!,
       startTime: _startTimeCtrl.text,
       endTime: _endTimeCtrl.text,
@@ -310,7 +331,9 @@ class _HomeScreenState extends State<HomeScreen>
       resolutionScale: _scale,
       frameNamePrefix: _framePrefix,
     );
-    final errors = params.validate();
+
+    final errors = isYouTube ? params.validateForYouTube() : params.validate();
+
     if (errors.isNotEmpty) {
       final c = AppTheme.of(context).colors;
       _toast(errors.first, c.red, c.redDim, Icons.error_rounded);
@@ -332,8 +355,7 @@ class _HomeScreenState extends State<HomeScreen>
   void _cancelExtraction() =>
       context.read<ExtractionBloc>().add(const CancelExtraction());
 
-  // ── Preset apply ──────────────────────────────────────────────────────────────
-
+  // Preset apply
   void _applyPreset(ExtractionPreset preset) {
     setState(() {
       _fps = preset.fps;
@@ -387,8 +409,7 @@ class _HomeScreenState extends State<HomeScreen>
     setState(() => _updateResult = UpdateService.resultNotifier.value);
   }
 
-  // ── Keyboard ──────────────────────────────────────────────────────────────────
-
+  // Keyboard
   void _handleKey(KeyEvent event) {
     if (event is! KeyDownEvent) return;
     final key = event.logicalKey;
@@ -422,8 +443,7 @@ class _HomeScreenState extends State<HomeScreen>
     }
   }
 
-  // ── Dialogs / panels (delegated to reusable helpers) ─────────────────────────
-
+  // Dialogs / panels
   void _showSettings() {
     final theme = AppTheme.of(context);
     if (_isDesktop) {
@@ -538,8 +558,7 @@ class _HomeScreenState extends State<HomeScreen>
     ).push(MaterialPageRoute(builder: (_) => const HistoryScreen()));
   }
 
-  // ── Utilities ─────────────────────────────────────────────────────────────────
-
+  // Utilities
   void _openFolder(String path) {
     if (Platform.isWindows) {
       Process.run('explorer', [path]);
@@ -723,8 +742,7 @@ class _HomeScreenState extends State<HomeScreen>
     return result ?? false;
   }
 
-  // ── Build ──────────────────────────────────────────────────────────────────────
-
+  // Build
   @override
   Widget build(BuildContext context) {
     final theme = AppTheme.of(context);
@@ -732,7 +750,7 @@ class _HomeScreenState extends State<HomeScreen>
     final isGlass = theme.isGlass;
 
     return KeyboardListener(
-      focusNode: FocusNode()..requestFocus(),
+      focusNode: _keyboardFocusNode,
       autofocus: true,
       onKeyEvent: _handleKey,
       child: AnnotatedRegion<SystemUiOverlayStyle>(
@@ -778,6 +796,7 @@ class _HomeScreenState extends State<HomeScreen>
                                         .read<ExtractionBloc>()
                                         .ffmpegService,
                                     ytUrlCtrl: _ytUrlCtrl,
+                                    lastFetchedUrl: _lastFetchedUrl,
                                     onModeChanged: (m) => setState(() {
                                       _sourceMode = m;
                                       if (m == SourceMode.local) _ytInfo = null;
@@ -791,7 +810,12 @@ class _HomeScreenState extends State<HomeScreen>
                                       if (info == null && _ytInfo == null) {
                                         _fetchYtInfo();
                                       } else {
-                                        setState(() => _ytInfo = info);
+                                        setState(() {
+                                          _ytInfo = info;
+                                          if (info == null) {
+                                            _lastFetchedUrl = '';
+                                          }
+                                        });
                                       }
                                     },
                                     onYtQualityChanged: (q) =>
@@ -905,8 +929,7 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  // ── Small build helpers ────────────────────────────────────────────────────────
-
+  // Small build helpers
   Widget _buildTitleBar(AppTheme theme) {
     final c = theme.colors;
     final isGlass = theme.isGlass;
@@ -1212,8 +1235,7 @@ class _HomeScreenState extends State<HomeScreen>
   }
 }
 
-// ── Reused private widgets (kept in this file — small enough) ─────────────────
-
+// Widgets
 class _ThemedDialogWrapper extends StatelessWidget {
   final BuildContext parentContext;
   final Widget Function(AppTheme) builder;

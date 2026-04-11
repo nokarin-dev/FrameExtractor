@@ -72,6 +72,51 @@ class ExtractionParams {
 
   bool get isValid => validate().isEmpty;
 
+  List<String> validateForYouTube() {
+    final errors = <String>[];
+
+    if (outputDirectory.trim().isEmpty) {
+      errors.add('Output directory is required.');
+    }
+
+    final startSec = parseTimeString(startTime);
+    final endSec = parseTimeString(endTime);
+
+    if (startSec == null) {
+      errors.add('Start time format is invalid. Use HH:MM:SS.');
+    }
+    if (endSec == null) errors.add('End time format is invalid. Use HH:MM:SS.');
+    if (startSec != null && endSec != null) {
+      if (startSec >= endSec) errors.add('Start time must be before end time.');
+      if ((endSec - startSec) < 0.1) {
+        errors.add('Time range is too short (minimum 0.1 s).');
+      }
+    }
+
+    if (fps < AppConstants.minFps || fps > AppConstants.maxFps) {
+      errors.add(
+        'FPS must be between ${AppConstants.minFps} and ${AppConstants.maxFps}.',
+      );
+    }
+    if (imageQuality < 1 || imageQuality > 100) {
+      errors.add('Image quality must be between 1 and 100.');
+    }
+    if (resolutionScale < AppConstants.minScale ||
+        resolutionScale > AppConstants.maxScale) {
+      errors.add(
+        'Resolution scale must be between ${AppConstants.minScale} and ${AppConstants.maxScale}.',
+      );
+    }
+    if (frameNamePrefix.trim().isEmpty) {
+      errors.add('Frame name prefix cannot be empty.');
+    }
+    if (RegExp(r'[<>:\"/\\|?*]').hasMatch(frameNamePrefix)) {
+      errors.add('Frame prefix contains illegal characters.');
+    }
+
+    return errors;
+  }
+
   factory ExtractionParams.validated({
     required String videoPath,
     required String outputDirectory,
