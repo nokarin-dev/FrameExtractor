@@ -8,6 +8,12 @@ This project loosely follows Keep a Changelog and uses Semantic Versioning.
 
 ## [Unreleased]
 
+No Changes Yet.
+
+---
+
+## [1.2.0] - 2026-04-13
+
 ### Added
 #### Core
 - **Preset System** - Save, browse, and apply named extraction presets (FPS, format, quality, scale, time range, prefix). Built-in presets included: High Quality PNG, Fast Preview, Web Optimized, 4K Lossless
@@ -129,8 +135,6 @@ This project loosely follows Keep a Changelog and uses Semantic Versioning.
 - Shared UI primitives extracted to `presentation/widgets/`: `app_card.dart`, `app_divider.dart`, `clear_row.dart`, `compact_field.dart`, `disabled_overlay.dart`, `file_row.dart`, `gloss_chip.dart`, `slider_row.dart`, `small_btn.dart`, `time_field.dart`, `video_metadata_card.dart`.
 - `isGlass` and `isDark` are no longer prop-drilled through every widget constructor. All extracted widgets call `AppTheme.of(context)` directly, relying on Flutter's `InheritedWidget` mechanism.
 - `ExtractionBloc._persistSettings` refactored to accept `ExtractionParams` instead of seven individual parameters.
-
----
 
 ## [1.1.3] - 2026-04-02
 ### Added
@@ -290,7 +294,8 @@ On first launch, required binaries are extracted to:
 
 ---
 
-[Unreleased]: https://github.com/nokarin-dev/frameextractor/compare/v1.1.3...HEAD
+[Unreleased]: https://github.com/nokarin-dev/frameextractor/compare/v1.2.0...HEAD
+[1.1.3]: https://github.com/nokarin-dev/frameextractor/releases/tag/v1.2.0
 [1.1.3]: https://github.com/nokarin-dev/frameextractor/releases/tag/v1.1.3
 [1.1.2]: https://github.com/nokarin-dev/frameextractor/releases/tag/v1.1.2
 [1.1.1]: https://github.com/nokarin-dev/frameextractor/releases/tag/v1.1.1
