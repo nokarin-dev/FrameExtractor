@@ -20,7 +20,9 @@ This project loosely follows Keep a Changelog and uses Semantic Versioning.
 - **Video metadata card** - after selecting a local video the app runs `ffmpeg` (desktop) or `FFprobeKit` (Android) to read duration, resolution, fps, and codec, then renders a thumbnail alongside these details below the source card. The thumbnail is cached in the system temp directory so subsequent opens are instant.
 - **Frame preview screen** - tap the thumbnail (or the preview button) to open a full-screen scrubber that renders the frame at any timestamp before committing to a full extraction. Uses `ffmpeg -vframes 1` under the hood; the preview is cached per-path-and-timestamp.
 - **Drag & drop video files** (desktop) - drag any supported video file directly onto the app window using the `desktop_drop` package. Unsupported extensions show a toast error.
-- **Keyboard shortcut `Ctrl+H`** - opens the History panel; added to the Settings keyboard shortcuts list.
+- **Keyboard shortcut `Ctrl+H`** - shortcut for history panel, added to the Settings keyboard shortcuts list.
+- **Long-press hint overlay** - a subtle dark pill in the bottom-right corner of the preview image reminds users that long-pressing copies the timestamp.
+- **`Ctrl+B` keyboard shortcut** - shortcut for batch panel, listed in the Settings shortcuts panel.
 
 #### Bloc / Events
 - `StartBatchExtraction` event - list of `ExtractionParams`, each run in sequence; first failure aborts the batch.
@@ -81,6 +83,9 @@ This project loosely follows Keep a Changelog and uses Semantic Versioning.
 - **History screen** - full-screen list of past extractions. Each tile shows video name, date, frame count, elapsed time, fps, format, and output path. "Clear all" with confirmation dialog. Works on desktop and Android (folder-open disabled on mobile).
 - **VideoMetadataCard widget** - thumbnail + resolution + duration + codec + fps chips. Tapping opens FramePreviewScreen.
 - **FramePreviewScreen** - scrubber slider (0–3600 s), timestamp label, refresh button, pinch-to-zoom via `InteractiveViewer`. Loading spinner and "could not extract" error state.
+- **Set as Start / Set as End** - two buttons in the preview control bar let the user set the extraction start or end time directly from the scrubbed frame, updating `_startTimeCtrl` / `_endTimeCtrl` in the home screen without leaving the preview screen.
+- **Retry on error** - if a frame cannot be extracted (e.g. timestamp beyond the actual end), an error state with a Retry button is shown instead of a blank screen.
+- **Save log** button added next to "Copy all". On desktop it writes to the Downloads folder (falls back to Documents); on Android it writes to the app Documents directory. Filename format: `frameextractor_log_YYYY-MM-DDTHH-MM-SS.txt`. The button is visually disabled (dimmed) when there are no log lines.
 - History button (clock icon) in title bar; `Ctrl+H` shortcut.
 - ProgressSection now shows a "Job N of M" indicator during batch runs and renders a `BATCH` phase label.
 - Time field error state: red border, red icon, red label, red tinted background, inline error text below field

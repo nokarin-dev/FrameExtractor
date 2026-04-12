@@ -4,6 +4,7 @@ import 'package:frameextractor/core/app_prefs.dart';
 import 'package:frameextractor/data/models/video_metadata.dart';
 import 'package:frameextractor/data/services/ffmpeg/ffmpeg_service_base.dart';
 import 'package:frameextractor/data/services/youtube_service.dart';
+import 'package:frameextractor/presentation/screens/frame_preview_screen.dart';
 import 'package:frameextractor/presentation/theme/app_theme.dart';
 import 'package:frameextractor/presentation/widgets/app_card.dart';
 import 'package:frameextractor/presentation/widgets/app_divider.dart';
@@ -32,6 +33,7 @@ class SourceSection extends StatefulWidget {
   final ValueChanged<SourceMode> onModeChanged;
   final ValueChanged<String> onVideoSelected;
   final VoidCallback onVideoClear;
+  final void Function(FramePreviewResult)? onTimeSelected;
   final ValueChanged<YouTubeVideoInfo?> onYtInfoChanged;
   final ValueChanged<YouTubeQuality> onYtQualityChanged;
 
@@ -52,6 +54,7 @@ class SourceSection extends StatefulWidget {
     required this.onModeChanged,
     required this.onVideoSelected,
     required this.onVideoClear,
+    this.onTimeSelected,
     required this.onYtInfoChanged,
     required this.onYtQualityChanged,
   });
@@ -141,6 +144,7 @@ class _SourceSectionState extends State<SourceSection> {
               theme: theme,
               ffmpegService: widget.ffmpegService,
               videoPath: widget.videoPath!,
+              onTimeSelected: widget.onTimeSelected,
             ),
           ],
         ],

@@ -11,6 +11,7 @@ class VideoMetadataCard extends StatelessWidget {
   final AppTheme theme;
   final FFmpegService ffmpegService;
   final String videoPath;
+  final void Function(FramePreviewResult)? onTimeSelected;
 
   const VideoMetadataCard({
     super.key,
@@ -19,7 +20,21 @@ class VideoMetadataCard extends StatelessWidget {
     required this.theme,
     required this.ffmpegService,
     required this.videoPath,
+    this.onTimeSelected,
   });
+
+  void _openPreview(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => FramePreviewScreen(
+          videoPath: videoPath,
+          ffmpegService: ffmpegService,
+          videoDuration: metadata?.duration,
+          onTimeSelected: onTimeSelected,
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -68,14 +83,7 @@ class VideoMetadataCard extends StatelessWidget {
         children: [
           // Thumbnail
           GestureDetector(
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => FramePreviewScreen(
-                  videoPath: videoPath,
-                  ffmpegService: ffmpegService,
-                ),
-              ),
-            ),
+            onTap: () => _openPreview(context),
             child: ClipRRect(
               borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(11),
@@ -145,20 +153,13 @@ class VideoMetadataCard extends StatelessWidget {
             ),
           ),
 
-          // Preview hint
+          // Preview button
           Padding(
             padding: const EdgeInsets.only(right: 10),
             child: Tooltip(
               message: 'Preview frames',
               child: GestureDetector(
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => FramePreviewScreen(
-                      videoPath: videoPath,
-                      ffmpegService: ffmpegService,
-                    ),
-                  ),
-                ),
+                onTap: () => _openPreview(context),
                 child: Container(
                   width: 32,
                   height: 32,

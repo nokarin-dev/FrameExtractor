@@ -5,6 +5,7 @@ import 'package:desktop_drop/desktop_drop.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
@@ -69,6 +70,9 @@ class _HomeScreenState extends State<HomeScreen>
   YouTubeVideoInfo? _ytInfo;
   String _lastFetchedUrl = '';
 
+  // Batch extraction ranges
+  final List<({String start, String end, String prefix})> _batchRanges = [];
+
   // Misc
   List<String> _recentVideos = [];
   UpdateResult? _updateResult;
@@ -84,6 +88,8 @@ class _HomeScreenState extends State<HomeScreen>
   bool get _isExtracting =>
       context.read<ExtractionBloc>().state is ExtractionInProgress;
 
+  bool get _hasBatchRanges => _batchRanges.isNotEmpty;
+
   bool get _settingsEnabled {
     if (_isExtracting) return false;
     if (_outputDirectory == null) return false;
@@ -93,7 +99,9 @@ class _HomeScreenState extends State<HomeScreen>
 
   bool get _canExtract {
     if (_outputDirectory == null) return false;
-    if (_startTimeError != null || _endTimeError != null) return false;
+    if (!_hasBatchRanges) {
+      if (_startTimeError != null || _endTimeError != null) return false;
+    }
     if (_sourceMode == SourceMode.local) return _videoPath != null;
     return _ytInfo != null && _ytUrlCtrl.text.trim().isNotEmpty;
   }
@@ -320,6 +328,39 @@ class _HomeScreenState extends State<HomeScreen>
   void _startExtraction() {
     final isYouTube = _sourceMode == SourceMode.youtube;
 
+    // Batch mode
+    if (_hasBatchRanges && !isYouTube) {
+      final paramsList = _batchRanges
+          .map(
+            (r) => ExtractionParams(
+              videoPath: _videoPath ?? '',
+              outputDirectory: _outputDirectory!,
+              startTime: r.start,
+              endTime: r.end,
+              fps: _fps,
+              format: _format,
+              imageQuality: _quality,
+              resolutionScale: _scale,
+              frameNamePrefix: r.prefix,
+            ),
+          )
+          .toList();
+
+      // Validate range
+      for (final p in paramsList) {
+        final errs = p.validate();
+        if (errs.isNotEmpty) {
+          final c = AppTheme.of(context).colors;
+          _toast(errs.first, c.red, c.redDim, Icons.error_rounded);
+          return;
+        }
+      }
+
+      context.read<ExtractionBloc>().add(StartBatchExtraction(paramsList));
+      return;
+    }
+
+    // Single range mode
     final params = ExtractionParams(
       videoPath: isYouTube ? '__youtube__' : (_videoPath ?? ''),
       outputDirectory: _outputDirectory!,
@@ -354,6 +395,61 @@ class _HomeScreenState extends State<HomeScreen>
 
   void _cancelExtraction() =>
       context.read<ExtractionBloc>().add(const CancelExtraction());
+
+  void _showBatchPanel() {
+    final theme = AppTheme.of(context);
+    if (_isDesktop) {
+      showDialog(
+        context: context,
+        barrierColor: Colors.black.withValues(
+          alpha: theme.isDark ? 0.55 : 0.30,
+        ),
+        builder: (_) => _ThemedDialogWrapper(
+          parentContext: context,
+          builder: (liveTheme) => _GlassDialog(
+            theme: liveTheme,
+            maxWidth: 560,
+            child: _BatchContent(
+              parentContext: context,
+              initialStart: _startTimeCtrl.text,
+              initialEnd: _endTimeCtrl.text,
+              initialPrefix: _framePrefix,
+              ranges: _batchRanges,
+              onChanged: (ranges) => setState(
+                () => _batchRanges
+                  ..clear()
+                  ..addAll(ranges),
+              ),
+            ),
+          ),
+        ),
+      );
+    } else {
+      showModalBottomSheet(
+        context: context,
+        backgroundColor: Colors.transparent,
+        isScrollControlled: true,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        builder: (_) => _ThemedSheetWrapper(
+          parentContext: context,
+          builder: (liveTheme) => _BatchContent(
+            parentContext: context,
+            initialStart: _startTimeCtrl.text,
+            initialEnd: _endTimeCtrl.text,
+            initialPrefix: _framePrefix,
+            ranges: _batchRanges,
+            onChanged: (ranges) => setState(
+              () => _batchRanges
+                ..clear()
+                ..addAll(ranges),
+            ),
+          ),
+        ),
+      );
+    }
+  }
 
   // Preset apply
   void _applyPreset(ExtractionPreset preset) {
@@ -439,6 +535,12 @@ class _HomeScreenState extends State<HomeScreen>
     if (key == LogicalKeyboardKey.keyH &&
         HardwareKeyboard.instance.isControlPressed) {
       _showHistory();
+      return;
+    }
+    if (key == LogicalKeyboardKey.keyB &&
+        HardwareKeyboard.instance.isControlPressed &&
+        _settingsEnabled) {
+      _showBatchPanel();
       return;
     }
   }
@@ -820,6 +922,19 @@ class _HomeScreenState extends State<HomeScreen>
                                     },
                                     onYtQualityChanged: (q) =>
                                         setState(() => _ytQuality = q),
+                                    onTimeSelected: (result) {
+                                      setState(() {
+                                        if (result.startTime != null) {
+                                          _startTimeCtrl.text =
+                                              result.startTime!;
+                                        }
+                                        if (result.endTime != null) {
+                                          _endTimeCtrl.text = result.endTime!;
+                                        }
+                                      });
+                                      _validateTimeRange();
+                                      _refreshEstimates();
+                                    },
                                   ),
                                   const SizedBox(height: 10),
                                   OutputSection(
@@ -1137,34 +1252,99 @@ class _HomeScreenState extends State<HomeScreen>
 
   Widget _buildActionButtons(AppTheme theme, {required bool extracting}) {
     final c = theme.colors;
-    return Row(
+
+    final extractLabel = _hasBatchRanges
+        ? 'Extract ${_batchRanges.length} Ranges'
+        : 'Extract Frames';
+
+    return Column(
       children: [
-        Expanded(
-          child: _ActionBtn(
-            c: c,
-            label: extracting ? 'Working…' : 'Extract Frames',
-            icon: extracting
-                ? Icons.hourglass_top_rounded
-                : Icons.play_arrow_rounded,
-            color: c.accent,
-            tooltip: _canExtract && !extracting ? 'Space to start' : null,
-            onPressed: (extracting || !_canExtract) ? null : _startExtraction,
-            isGlass: theme.isGlass,
-            isDark: theme.isDark,
-          ),
+        Row(
+          children: [
+            Expanded(
+              child: _ActionBtn(
+                c: c,
+                label: extracting ? 'Working…' : extractLabel,
+                icon: extracting
+                    ? Icons.hourglass_top_rounded
+                    : Icons.play_arrow_rounded,
+                color: c.accent,
+                tooltip: _canExtract && !extracting ? 'Space to start' : null,
+                onPressed: (extracting || !_canExtract)
+                    ? null
+                    : _startExtraction,
+                isGlass: theme.isGlass,
+                isDark: theme.isDark,
+              ),
+            ),
+            if (extracting) ...[
+              const SizedBox(width: 10),
+              _ActionBtn(
+                c: c,
+                label: 'Cancel',
+                icon: Icons.stop_rounded,
+                color: c.red,
+                tooltip: 'Esc to cancel',
+                onPressed: _cancelExtraction,
+                compact: true,
+                isGlass: theme.isGlass,
+                isDark: theme.isDark,
+              ),
+            ],
+          ],
         ),
-        if (extracting) ...[
-          const SizedBox(width: 10),
-          _ActionBtn(
-            c: c,
-            label: 'Cancel',
-            icon: Icons.stop_rounded,
-            color: c.red,
-            tooltip: 'Esc to cancel',
-            onPressed: _cancelExtraction,
-            compact: true,
-            isGlass: theme.isGlass,
-            isDark: theme.isDark,
+        // Batch button
+        if (_settingsEnabled &&
+            !extracting &&
+            _sourceMode == SourceMode.local) ...[
+          const SizedBox(height: 8),
+          MouseRegion(
+            cursor: SystemMouseCursors.click,
+            child: GestureDetector(
+              onTap: _showBatchPanel,
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 9),
+                decoration: BoxDecoration(
+                  color: _hasBatchRanges
+                      ? c.orange.withValues(alpha: theme.isGlass ? 0.15 : 0.12)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: _hasBatchRanges
+                        ? c.orange.withValues(alpha: 0.45)
+                        : (theme.isGlass
+                              ? (theme.isDark
+                                    ? Colors.white.withValues(alpha: 0.14)
+                                    : c.borderHi)
+                              : c.border),
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      _hasBatchRanges
+                          ? Icons.playlist_play_rounded
+                          : Icons.playlist_add_rounded,
+                      size: 14,
+                      color: _hasBatchRanges ? c.orange : c.textMuted,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      _hasBatchRanges
+                          ? 'Batch: ${_batchRanges.length} range${_batchRanges.length == 1 ? '' : 's'}  ·  Edit (Ctrl+B)'
+                          : 'Add batch ranges  (Ctrl+B)',
+                      style: TextStyle(
+                        color: _hasBatchRanges ? c.orange : c.textMuted,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
         ],
       ],
@@ -1546,6 +1726,12 @@ class _SettingsBody extends StatelessWidget {
                       c: c,
                       key_: 'Ctrl+P',
                       label: 'Open presets panel',
+                    ),
+                    _ShortcutRow(c: c, key_: 'Ctrl+H', label: 'Open history'),
+                    _ShortcutRow(
+                      c: c,
+                      key_: 'Ctrl+B',
+                      label: 'Edit batch ranges',
                     ),
                   ],
                 ),
@@ -2313,59 +2499,664 @@ class _LogBody extends StatelessWidget {
                     ),
             ),
             Padding(
-              padding: const EdgeInsets.all(16),
-              child: MouseRegion(
-                cursor: SystemMouseCursors.click,
-                child: GestureDetector(
-                  onTap: () {
-                    Clipboard.setData(ClipboardData(text: logs.join('\n')));
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Logs copied to clipboard'),
-                        duration: Duration(seconds: 2),
-                        behavior: SnackBarBehavior.floating,
-                      ),
-                    );
-                  },
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    decoration: BoxDecoration(
-                      color: theme.isGlass
-                          ? (theme.isDark
-                                ? Colors.white.withValues(alpha: 0.08)
-                                : c.surfaceHi)
-                          : c.surfaceHi,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: theme.isGlass
-                            ? (theme.isDark
-                                  ? Colors.white.withValues(alpha: 0.15)
-                                  : c.borderHi)
-                            : c.border,
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.copy_rounded, color: c.textSec, size: 14),
-                        const SizedBox(width: 6),
-                        Text(
-                          'Copy all logs',
-                          style: TextStyle(
-                            color: c.textSec,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: Row(
+                children: [
+                  // Copy all logs
+                  Expanded(
+                    child: MouseRegion(
+                      cursor: SystemMouseCursors.click,
+                      child: GestureDetector(
+                        onTap: () {
+                          Clipboard.setData(
+                            ClipboardData(text: logs.join('\n')),
+                          );
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Logs copied to clipboard'),
+                              duration: Duration(seconds: 2),
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          decoration: BoxDecoration(
+                            color: theme.isGlass
+                                ? (theme.isDark
+                                      ? Colors.white.withValues(alpha: 0.08)
+                                      : c.surfaceHi)
+                                : c.surfaceHi,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: theme.isGlass
+                                  ? (theme.isDark
+                                        ? Colors.white.withValues(alpha: 0.15)
+                                        : c.borderHi)
+                                  : c.border,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.copy_rounded,
+                                color: c.textSec,
+                                size: 14,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Copy all',
+                                style: TextStyle(
+                                  color: c.textSec,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ],
+                      ),
                     ),
                   ),
-                ),
+                  const SizedBox(width: 8),
+                  // Save log to file
+                  Expanded(
+                    child: MouseRegion(
+                      cursor: logs.isEmpty
+                          ? SystemMouseCursors.basic
+                          : SystemMouseCursors.click,
+                      child: GestureDetector(
+                        onTap: logs.isEmpty
+                            ? null
+                            : () async {
+                                try {
+                                  final String dir;
+                                  if (Platform.isAndroid) {
+                                    // Android
+                                    final d =
+                                        await getApplicationDocumentsDirectory();
+                                    dir = d.path;
+                                  } else {
+                                    // Desktop
+                                    final d =
+                                        await getDownloadsDirectory() ??
+                                        await getApplicationDocumentsDirectory();
+                                    dir = d.path;
+                                  }
+                                  final ts = DateTime.now()
+                                      .toIso8601String()
+                                      .replaceAll(':', '-')
+                                      .substring(0, 19);
+                                  final path =
+                                      '$dir${Platform.pathSeparator}frameextractor_log_$ts.txt';
+                                  await File(
+                                    path,
+                                  ).writeAsString(logs.join('\n'));
+                                  if (!context.mounted) return;
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('Log saved to $path'),
+                                      duration: const Duration(seconds: 4),
+                                      behavior: SnackBarBehavior.floating,
+                                    ),
+                                  );
+                                } catch (e) {
+                                  if (!context.mounted) return;
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('Could not save log: $e'),
+                                      duration: const Duration(seconds: 4),
+                                      behavior: SnackBarBehavior.floating,
+                                    ),
+                                  );
+                                }
+                              },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          decoration: BoxDecoration(
+                            color: logs.isEmpty
+                                ? (theme.isGlass
+                                      ? Colors.white.withValues(alpha: 0.04)
+                                      : c.surface)
+                                : c.accent.withValues(alpha: 0.10),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: logs.isEmpty
+                                  ? (theme.isGlass
+                                        ? Colors.white.withValues(alpha: 0.10)
+                                        : c.border)
+                                  : c.accent.withValues(alpha: 0.35),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.save_alt_rounded,
+                                color: logs.isEmpty ? c.textMuted : c.accent,
+                                size: 14,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Save log',
+                                style: TextStyle(
+                                  color: logs.isEmpty ? c.textMuted : c.accent,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// Batch panel
+class _BatchContent extends StatefulWidget {
+  final BuildContext parentContext;
+  final String initialStart;
+  final String initialEnd;
+  final String initialPrefix;
+  final List<({String start, String end, String prefix})> ranges;
+  final ValueChanged<List<({String start, String end, String prefix})>>
+  onChanged;
+
+  const _BatchContent({
+    required this.parentContext,
+    required this.initialStart,
+    required this.initialEnd,
+    required this.initialPrefix,
+    required this.ranges,
+    required this.onChanged,
+  });
+
+  @override
+  State<_BatchContent> createState() => _BatchContentState();
+}
+
+class _BatchContentState extends State<_BatchContent> {
+  late List<_BatchRangeEntry> _entries;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.ranges.isEmpty) {
+      _entries = [
+        _BatchRangeEntry(
+          start: widget.initialStart,
+          end: widget.initialEnd,
+          prefix: widget.initialPrefix,
+        ),
+      ];
+    } else {
+      _entries = widget.ranges
+          .map(
+            (r) =>
+                _BatchRangeEntry(start: r.start, end: r.end, prefix: r.prefix),
+          )
+          .toList();
+    }
+  }
+
+  void _addRange() {
+    final last = _entries.isNotEmpty ? _entries.last : null;
+    setState(() {
+      _entries.add(
+        _BatchRangeEntry(
+          start: last?.end ?? '00:00:00',
+          end: '00:00:05',
+          prefix: 'range${_entries.length + 1}_',
+        ),
+      );
+    });
+  }
+
+  void _removeRange(int i) {
+    if (_entries.length <= 1) return;
+    setState(() => _entries.removeAt(i));
+  }
+
+  void _apply() {
+    final ranges = _entries
+        .map((e) => (start: e.start, end: e.end, prefix: e.prefix))
+        .toList();
+    widget.onChanged(ranges);
+    Navigator.of(context).pop();
+  }
+
+  void _clear() {
+    widget.onChanged([]);
+    Navigator.of(context).pop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = AppTheme.of(widget.parentContext);
+    final c = theme.colors;
+
+    return SizedBox(
+      height: _isDesktop ? 520 : null,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Header
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+            child: Row(
+              children: [
+                Icon(Icons.playlist_play_rounded, color: c.orange, size: 16),
+                const SizedBox(width: 8),
+                Text(
+                  'Batch Ranges',
+                  style: TextStyle(
+                    color: c.textPri,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: c.surfaceHi,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    '${_entries.length} range${_entries.length == 1 ? '' : 's'}',
+                    style: TextStyle(
+                      color: c.textSec,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                _CloseBtn(c: c, isGlass: theme.isGlass, isDark: theme.isDark),
+              ],
+            ),
+          ),
+          Container(
+            height: 1,
+            color: theme.isGlass
+                ? (theme.isDark
+                      ? Colors.white.withValues(alpha: 0.08)
+                      : c.border)
+                : c.border,
+          ),
+
+          // Range list
+          Flexible(
+            child: ReorderableListView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              shrinkWrap: true,
+              itemCount: _entries.length,
+              onReorder: (oldIdx, newIdx) {
+                setState(() {
+                  if (newIdx > oldIdx) newIdx--;
+                  final item = _entries.removeAt(oldIdx);
+                  _entries.insert(newIdx, item);
+                });
+              },
+              itemBuilder: (_, i) {
+                final e = _entries[i];
+                return _RangeRow(
+                  key: ValueKey(e),
+                  index: i,
+                  entry: e,
+                  c: c,
+                  theme: theme,
+                  canDelete: _entries.length > 1,
+                  onChanged: (updated) => setState(() => _entries[i] = updated),
+                  onDelete: () => _removeRange(i),
+                );
+              },
+            ),
+          ),
+
+          Container(
+            height: 1,
+            color: theme.isGlass
+                ? (theme.isDark
+                      ? Colors.white.withValues(alpha: 0.08)
+                      : c.border)
+                : c.border,
+          ),
+
+          // Footer buttons
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+            child: Row(
+              children: [
+                // Add range
+                MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: GestureDetector(
+                    onTap: _addRange,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 9,
+                      ),
+                      decoration: BoxDecoration(
+                        color: c.accent.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(9),
+                        border: Border.all(
+                          color: c.accent.withValues(alpha: 0.35),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.add_rounded, color: c.accent, size: 14),
+                          const SizedBox(width: 5),
+                          Text(
+                            'Add range',
+                            style: TextStyle(
+                              color: c.accent,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const Spacer(),
+                // Clear
+                MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: GestureDetector(
+                    onTap: _clear,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 9,
+                      ),
+                      decoration: BoxDecoration(
+                        color: c.surfaceHi,
+                        borderRadius: BorderRadius.circular(9),
+                        border: Border.all(color: c.border),
+                      ),
+                      child: Text(
+                        'Clear',
+                        style: TextStyle(
+                          color: c.textSec,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Apply
+                MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: GestureDetector(
+                    onTap: _apply,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 9,
+                      ),
+                      decoration: BoxDecoration(
+                        color: c.accent.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(9),
+                        border: Border.all(
+                          color: c.accent.withValues(alpha: 0.50),
+                        ),
+                      ),
+                      child: Text(
+                        'Apply',
+                        style: TextStyle(
+                          color: c.accent,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BatchRangeEntry {
+  String start;
+  String end;
+  String prefix;
+  _BatchRangeEntry({
+    required this.start,
+    required this.end,
+    required this.prefix,
+  });
+}
+
+class _RangeRow extends StatefulWidget {
+  final int index;
+  final _BatchRangeEntry entry;
+  final AppColors c;
+  final AppTheme theme;
+  final bool canDelete;
+  final ValueChanged<_BatchRangeEntry> onChanged;
+  final VoidCallback onDelete;
+
+  const _RangeRow({
+    super.key,
+    required this.index,
+    required this.entry,
+    required this.c,
+    required this.theme,
+    required this.canDelete,
+    required this.onChanged,
+    required this.onDelete,
+  });
+
+  @override
+  State<_RangeRow> createState() => _RangeRowState();
+}
+
+class _RangeRowState extends State<_RangeRow> {
+  late TextEditingController _startCtrl;
+  late TextEditingController _endCtrl;
+  late TextEditingController _prefixCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _startCtrl = TextEditingController(text: widget.entry.start);
+    _endCtrl = TextEditingController(text: widget.entry.end);
+    _prefixCtrl = TextEditingController(text: widget.entry.prefix);
+  }
+
+  @override
+  void dispose() {
+    _startCtrl.dispose();
+    _endCtrl.dispose();
+    _prefixCtrl.dispose();
+    super.dispose();
+  }
+
+  void _notify() {
+    widget.onChanged(
+      _BatchRangeEntry(
+        start: _startCtrl.text,
+        end: _endCtrl.text,
+        prefix: _prefixCtrl.text,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = widget.c;
+    final isGlass = widget.theme.isGlass;
+    final isDark = widget.theme.isDark;
+
+    final fieldStyle = TextStyle(color: c.textPri, fontSize: 12);
+    final hintStyle = TextStyle(color: c.textMuted, fontSize: 12);
+
+    InputDecoration fieldDeco(String hint) => InputDecoration(
+      hintText: hint,
+      hintStyle: hintStyle,
+      filled: true,
+      fillColor: isGlass
+          ? (isDark
+                ? Colors.white.withValues(alpha: 0.07)
+                : c.surface.withValues(alpha: 0.60))
+          : c.surfaceHi,
+      isDense: true,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 9, vertical: 8),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: BorderSide(color: c.border),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: BorderSide(color: c.border),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: BorderSide(color: c.accent, width: 1.5),
+      ),
+    );
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: isGlass
+            ? (isDark
+                  ? Colors.white.withValues(alpha: 0.05)
+                  : c.surface.withValues(alpha: 0.55))
+            : c.surfaceHi,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: isGlass
+              ? (isDark
+                    ? Colors.white.withValues(alpha: 0.10)
+                    : c.borderHi.withValues(alpha: 0.60))
+              : c.border,
+        ),
+      ),
+      child: Row(
+        children: [
+          // Drag handle
+          Icon(Icons.drag_handle_rounded, size: 16, color: c.textMuted),
+          const SizedBox(width: 8),
+
+          // Range number
+          Container(
+            width: 22,
+            height: 22,
+            decoration: BoxDecoration(
+              color: c.orange.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Center(
+              child: Text(
+                '${widget.index + 1}',
+                style: TextStyle(
+                  color: c.orange,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+
+          // Start / End / Prefix fields
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _startCtrl,
+                        style: fieldStyle,
+                        decoration: fieldDeco('00:00:00'),
+                        onChanged: (_) => _notify(),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                      child: Icon(
+                        Icons.arrow_forward_rounded,
+                        size: 12,
+                        color: c.textMuted,
+                      ),
+                    ),
+                    Expanded(
+                      child: TextField(
+                        controller: _endCtrl,
+                        style: fieldStyle,
+                        decoration: fieldDeco('00:00:05'),
+                        onChanged: (_) => _notify(),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: _prefixCtrl,
+                  style: fieldStyle,
+                  decoration: fieldDeco('frame_prefix_'),
+                  onChanged: (_) => _notify(),
+                ),
+              ],
+            ),
+          ),
+
+          // Delete button
+          const SizedBox(width: 8),
+          Opacity(
+            opacity: widget.canDelete ? 1.0 : 0.3,
+            child: MouseRegion(
+              cursor: widget.canDelete
+                  ? SystemMouseCursors.click
+                  : SystemMouseCursors.basic,
+              child: GestureDetector(
+                onTap: widget.canDelete ? widget.onDelete : null,
+                child: Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: c.red.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(7),
+                    border: Border.all(color: c.red.withValues(alpha: 0.30)),
+                  ),
+                  child: Icon(
+                    Icons.delete_outline_rounded,
+                    color: c.red,
+                    size: 14,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
