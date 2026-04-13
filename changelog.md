@@ -13,7 +13,6 @@ No Changes Yet.
 ---
 
 ## [1.2.0] - 2026-04-13
-
 ### Added
 #### Core
 - **Preset System** - Save, browse, and apply named extraction presets (FPS, format, quality, scale, time range, prefix). Built-in presets included: High Quality PNG, Fast Preview, Web Optimized, 4K Lossless
