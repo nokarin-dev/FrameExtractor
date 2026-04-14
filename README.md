@@ -108,22 +108,22 @@ flutter build apk --release --split-per-abi # Android
 <img width="1536" height="100" alt="Preview" src="https://github.com/user-attachments/assets/51d91558-920f-4204-8512-fa0e965872f3" />
 
 ### Home Screen - Local
-<img width="1536" height="100" alt="Preview" src="https://github.com/nokarin-dev/FrameExtractor/blob/flutter/assets/preview/HomeScreen_Local.png?raw=true" />
+<img width="1920" height="1042" alt="Preview" src="https://github.com/nokarin-dev/FrameExtractor/blob/flutter/assets/preview/HomeScreen_Local.png?raw=true" />
 
 ### Home Screen - YouTube
-<img width="1920" height="1043" alt="Home Screen Local" src="https://github.com/nokarin-dev/FrameExtractor/blob/flutter/assets/preview/HomeScreen_Youtube.png?raw=true" />>
+<img width="1920" height="1042" alt="Home Screen Local" src="https://github.com/nokarin-dev/FrameExtractor/blob/flutter/assets/preview/HomeScreen_Youtube.png?raw=true" />>
 
 ### Settings Screen
-<img width="1920" height="1043" alt="Settings Screen" src="https://github.com/nokarin-dev/FrameExtractor/blob/flutter/assets/preview/SettingsScreen.png?raw=true" />
+<img width="1920" height="1042" alt="Settings Screen" src="https://github.com/nokarin-dev/FrameExtractor/blob/flutter/assets/preview/SettingsScreen.png?raw=true" />
 
 ### Log Screen
-<img width="1920" height="1043" alt="Log Screen" src="https://github.com/nokarin-dev/FrameExtractor/blob/flutter/assets/preview/LogScreen.png?raw=true" />
+<img width="1920" height="1042" alt="Log Screen" src="https://github.com/nokarin-dev/FrameExtractor/blob/flutter/assets/preview/LogScreen.png?raw=true" />
 
 ### Preset Screen
-<img width="1920" height="1043" alt="Log Screen" src="https://github.com/nokarin-dev/FrameExtractor/blob/flutter/assets/preview/PresetScreen.png?raw=true" />
+<img width="1920" height="1042" alt="Log Screen" src="https://github.com/nokarin-dev/FrameExtractor/blob/flutter/assets/preview/PresetScreen.png?raw=true" />
 
 ### History Screen
-<img width="1920" height="1043" alt="Log Screen" src="https://github.com/nokarin-dev/FrameExtractor/blob/flutter/assets/preview/HistoryScreen.png?raw=true" />
+<img width="1920" height="1042" alt="Log Screen" src="https://github.com/nokarin-dev/FrameExtractor/blob/flutter/assets/preview/HistoryScreen.png?raw=true" />
 
 ---
 
