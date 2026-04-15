@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+    <component type="desktop-application">
+        <id>io.github.nokarin.FrameExtractor</id>
+        <name>FrameExtractor</name>
+        <summary>Effortless video frame extraction</summary>
+        <description>
+            <p>
+                FrameExtractor is a modern cross-platform video frame extractor
+                with a clean dark UI. It supports local video files and can
+                download and extract frames directly from YouTube URLs.
+            </p>
+            <p>Features:</p>
+            <ul>
+                <li>Extract frames from local video files (MP4, MKV, AVI, MOV, and more)</li>
+                <li>Extract frames directly from YouTube URLs via yt-dlp</li>
+                <li>Adjustable FPS, output format (PNG, JPG, WebP, BMP), quality, and scale</li>
+                <li>Live frame count and size estimates before extraction</li>
+                <li>Frame preview with scrubber before committing to a full extraction</li>
+                <li>Batch extraction across multiple time ranges</li>
+                <li>Preset system to save and reuse extraction settings</li>
+                <li>Extraction history with one-click re-extraction</li>
+            </ul>
+        </description>
+
+        <launchable type="desktop-id">io.github.nokarin.FrameExtractor.desktop</launchable>
+
+        <url type="homepage">https://github.com/nokarin-dev/frameextractor</url>
+        <url type="bugtracker">https://github.com/nokarin-dev/frameextractor/issues</url>
+        <url type="vcs-browser">https://github.com/nokarin-dev/frameextractor</url>
+
+        <developer id="io.github.nokarin">
+            <name>nokarin</name>
+        </developer>
+
+        <metadata_license>CC0-1.0</metadata_license>
+        <project_license>GPL-3.0-or-later</project_license>
+
+        <supports>
+            <control>pointing</control>
+            <control>keyboard</control>
+        </supports>
+
+        <categories>
+            <category>Video</category>
+            <category>AudioVideo</category>
+        </categories>
+
+        <screenshots>
+            <screenshot type="default">
+                <image>https://github.com/nokarin-dev/FrameExtractor/blob/1472f252dd6ed6ec45e0a43474a489389bb42fe4/assets/preview/HomeScreen_Local.png</image>
+                <caption>Home Screen - Local</caption>
+            </screenshot>
+            <screenshot>
+                <image>https://github.com/nokarin-dev/FrameExtractor/blob/1472f252dd6ed6ec45e0a43474a489389bb42fe4/assets/preview/HomeScreen_Youtube.png</image>
+                <caption>Home Screen - YouTube</caption>
+            </screenshot>
+            <screenshot>
+                <image>https://github.com/nokarin-dev/FrameExtractor/blob/1472f252dd6ed6ec45e0a43474a489389bb42fe4/assets/preview/SettingsScreen.png</image>
+                <caption>Settings Screen</caption>
+            </screenshot>
+            <screenshot>
+                <image>https://github.com/nokarin-dev/FrameExtractor/blob/1472f252dd6ed6ec45e0a43474a489389bb42fe4/assets/preview/LogScreen.png</image>
+                <caption>Log Screen</caption>
+            </screenshot>
+            <screenshot>
+                <image>https://github.com/nokarin-dev/FrameExtractor/blob/1472f252dd6ed6ec45e0a43474a489389bb42fe4/assets/preview/PresetScreen.png</image>
+                <caption>Preset Screen</caption>
+            </screenshot>
+            <screenshot>
+                <image>https://github.com/nokarin-dev/FrameExtractor/blob/1472f252dd6ed6ec45e0a43474a489389bb42fe4/assets/preview/HistoryScreen.png</image>
+                <caption>History Screen</caption>
+            </screenshot>
+        </screenshots>
+
+        <releases>
+            <release version="1.2.0" date="2026-04-13">
+                <description>
+                <p>Frame preview with video-bounded scrubber, batch extraction UI,
+                save-log button, and various bug fixes.</p>
+                </description>
+            </release>
+        </releases>
+
+        <content_rating type="oars-1.1" />
+    </component>
