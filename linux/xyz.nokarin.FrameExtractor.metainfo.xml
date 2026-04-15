@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
     <component type="desktop-application">
-        <id>io.github.nokarin.FrameExtractor</id>
+        <id>xyz.nokarin.FrameExtractor</id>
         <name>FrameExtractor</name>
         <summary>Effortless video frame extraction</summary>
         <description>
@@ -22,13 +22,13 @@
             </ul>
         </description>
 
-        <launchable type="desktop-id">io.github.nokarin.FrameExtractor.desktop</launchable>
+        <launchable type="desktop-id">xyz.nokarin.FrameExtractor.desktop</launchable>
 
         <url type="homepage">https://github.com/nokarin-dev/frameextractor</url>
         <url type="bugtracker">https://github.com/nokarin-dev/frameextractor/issues</url>
         <url type="vcs-browser">https://github.com/nokarin-dev/frameextractor</url>
 
-        <developer id="io.github.nokarin">
+        <developer id="xyz.nokarin">
             <name>nokarin</name>
         </developer>
 
