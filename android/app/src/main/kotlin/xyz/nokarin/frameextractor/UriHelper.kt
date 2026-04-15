@@ -1,4 +1,4 @@
-package com.nokarin.frameextractor
+package xyz.nokarin.frameextractor
 
 import android.content.Context
 import android.net.Uri

@@ -1,4 +1,4 @@
-package com.nokarin.frameextractor
+package xyz.nokarin.frameextractor
 
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -6,7 +6,7 @@ import io.flutter.plugin.common.MethodChannel
 import androidx.core.net.toUri
 
 class MainActivity : FlutterActivity() {
-    private val CHANNEL = "com.nokarin.frameextractor/native"
+    private val CHANNEL = "xyz.nokarin.frameextractor/native"
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)

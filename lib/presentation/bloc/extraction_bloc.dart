@@ -389,7 +389,7 @@ class ExtractionBloc extends Bloc<ExtractionEvent, ExtractionState> {
         );
         emit(
           ExtractionSuccess(
-            'Done! $frameCount frames in:\nAndroid/data/com.nokarin.frameextractor/files/',
+            'Done! $frameCount frames in:\nAndroid/data/xyz.nokarin.frameextractor/files/',
             outputDirectory: tempDir,
             frameCount: frameCount,
           ),
@@ -437,9 +437,9 @@ class ExtractionBloc extends Bloc<ExtractionEvent, ExtractionState> {
       emit(
         ExtractionSuccess(
           'Done! $frameCount frames saved to:\n'
-          'Android/data/com.nokarin.frameextractor/files/\n\n'
+          'Android/data/xyz.nokarin.frameextractor/files/\n\n'
           'Access via Files app → Internal Storage → Android → data '
-          '→ com.nokarin.frameextractor → files',
+          '→ xyz.nokarin.frameextractor → files',
           outputDirectory: tempDir,
           frameCount: frameCount,
         ),

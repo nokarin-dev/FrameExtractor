@@ -15,7 +15,7 @@ plugins {
 }
 
 android {
-    namespace = "com.nokarin.frameextractor"
+    namespace = "xyz.nokarin.frameextractor"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -31,7 +31,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.nokarin.frameextractor"
+        applicationId = "xyz.nokarin.frameextractor"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode

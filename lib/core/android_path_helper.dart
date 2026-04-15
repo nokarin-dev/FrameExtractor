@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 
 class AndroidPathHelper {
-  static const _channel = MethodChannel('com.nokarin.frameextractor/native');
+  static const _channel = MethodChannel('xyz.nokarin.frameextractor/native');
 
   static Future<String> resolveOutputDirectory(String uriOrPath) async {
     if (!Platform.isAndroid) return uriOrPath;
