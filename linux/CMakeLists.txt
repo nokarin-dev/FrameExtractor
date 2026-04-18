@@ -14,7 +14,7 @@ set(APPLICATION_ID "xyz.nokarin.frameextractor")
 cmake_policy(SET CMP0063 NEW)
 
 # Load bundled libraries from the lib/ directory relative to the binary.
-if(DART_DEFINES AND ${DART_DEFINES} MATCHES "FLATPAK=true")
+if(DEFINED FLATPAK AND ${FLATPAK} STREQUAL "true")
   set(CMAKE_INSTALL_RPATH "/app/lib")
 else()
   set(CMAKE_INSTALL_RPATH "$ORIGIN/lib")
@@ -92,7 +92,7 @@ install(CODE "
   file(REMOVE_RECURSE \"${BUILD_BUNDLE_DIR}/\")
   " COMPONENT Runtime)
 
-if(DART_DEFINES AND ${DART_DEFINES} MATCHES "FLATPAK=true")
+if(DEFINED FLATPAK AND ${FLATPAK} STREQUAL "true")
   set(INSTALL_BUNDLE_DATA_DIR "${CMAKE_INSTALL_PREFIX}/share/${APPLICATION_ID}data")
   set(INSTALL_BUNDLE_LIB_DIR "${CMAKE_INSTALL_PREFIX}/lib/${APPLICATION_ID}")
   install(TARGETS ${BINARY_NAME} RUNTIME DESTINATION "${CMAKE_INSTALL_PREFIX}/share/${APPLICATION_ID}"
