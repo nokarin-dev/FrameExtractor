@@ -115,7 +115,7 @@ jobs:
 
       # Installer (deb)
       - name: Build Linux release (installer)
-        run: flutter build linux --release --dart-define=PORTABLE=false
+        run: flutter build linux --release --dart-define=PORTABLE=false --dart-define=FLATPAK=falses
 
       - name: Inject binaries
         run: |
@@ -226,7 +226,7 @@ jobs:
 
       # Portable
       - name: Build Linux release (portable)
-        run: flutter build linux --release --dart-define=PORTABLE=true
+        run: flutter build linux --release --dart-define=PORTABLE=true --dart-define=FLATPAK=false
 
       - name: Inject binaries (portable)
         run: |
@@ -286,7 +286,7 @@ jobs:
         run: flutter pub get
 
       - name: Build Linux (debug)
-        run: flutter build linux --debug --dart-define=PORTABLE=false
+        run: flutter build linux --debug --dart-define=PORTABLE=false --dart-define=FLATPAK=false
 
       - name: Inject binaries
         run: |
