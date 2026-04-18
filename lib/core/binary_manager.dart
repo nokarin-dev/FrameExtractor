@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 
+const bool _kFlatpak = bool.fromEnvironment('FLATPAK');
 class BinaryManager {
   BinaryManager._();
   static final BinaryManager instance = BinaryManager._();
@@ -20,17 +21,20 @@ class BinaryManager {
 
   Future<void> initialize({bool isPortable = false}) async {
     if (Platform.isAndroid) return;
-    _initDesktop();
+    _initDesktop(isPortable: isPortable);
   }
 
   void _initDesktop({bool isPortable = false}) {
-    final String binDir;
+    if (_kFlatpak) {
+      _ffmpegPath = 'ffmpeg';
+      _ytDlpPath = '/app/bin/bin/yt-dlp';
+      return;
+    }
 
+    final String binDir;
     if (kDebugMode) {
       final platform = _platformFolder();
       binDir = p.join(Directory.current.path, 'assets', 'binaries', platform);
-    } else if (isPortable) {
-      binDir = p.join(File(Platform.resolvedExecutable).parent.path, 'bin');
     } else {
       binDir = p.join(File(Platform.resolvedExecutable).parent.path, 'bin');
     }
@@ -40,9 +44,7 @@ class BinaryManager {
   }
 
   Future<({bool ffmpeg, bool ytDlp})> selfTest() async {
-    if (Platform.isAndroid) {
-      return (ffmpeg: true, ytDlp: true);
-    }
+    if (Platform.isAndroid) return (ffmpeg: true, ytDlp: true);
 
     final ffm = await _check(_ffmpegPath!, ['-version']);
     final yt = await _check(_ytDlpPath!, ['--version']);
