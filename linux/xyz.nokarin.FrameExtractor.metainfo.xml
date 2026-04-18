@@ -75,6 +75,7 @@
 
     <releases>
         <release version="1.2.0" date="2026-04-13">
+            <url type="details">https://github.com/nokarin-dev/FrameExtractor/releases/tag/v1.2.0</url>
             <description>
                 <p>Frame preview with video-bounded scrubber, batch extraction UI,
                 save-log button, and various bug fixes.</p>
