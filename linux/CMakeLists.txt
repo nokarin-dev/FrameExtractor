@@ -22,7 +22,7 @@ cmake_policy(SET CMP0063 NEW)
 # Load bundled libraries from the lib/ directory relative to the binary.
 if(FLATPAK)
   message(STATUS "Using Flatpak-specific RPATH settings")
-  set(CMAKE_INSTALL_RPATH "/app/lib")
+  set(CMAKE_INSTALL_RPATH "$ORIGIN/../../lib/${APPLICATION_ID}/")
 else()
   message(STATUS "Using default RPATH settings")
   set(CMAKE_INSTALL_RPATH "$ORIGIN/lib")
