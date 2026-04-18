@@ -195,7 +195,7 @@ jobs:
 
       # Release build
       - name: Build Linux release
-        run: flutter build linux --release --dart-define=PORTABLE=false --dart-define=FLATPAK=false
+        run: flutter build linux --release --dart-define=PORTABLE=false
 
       - name: Inject binaries
         run: |
@@ -349,7 +349,7 @@ jobs:
 
       # Portable tarball
       - name: Build Linux (portable)
-        run: flutter build linux --release --dart-define=PORTABLE=true --dart-define=FLATPAK=false
+        run: flutter build linux --release --dart-define=PORTABLE=true
 
       - name: Inject binaries (portable)
         run: |
@@ -417,7 +417,7 @@ jobs:
           echo "VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //;s/+.*//')" >> $GITHUB_ENV
 
       - name: Build Linux (release)
-        run: flutter build linux --release --dart-define=PORTABLE=false --dart-define=FLATPAK=false
+        run: flutter build linux --release --dart-define=PORTABLE=false
 
       - name: Inject binaries
         run: |
