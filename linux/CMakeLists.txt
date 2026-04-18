@@ -13,6 +13,8 @@ option(FLATPAK "Build for Flatpak" OFF)
 
 if($ENV{FLATPAK} STREQUAL "true")
   set(FLATPAK ON)
+else()
+  set(FLATPAK OFF)
 endif()
 
 # Explicitly opt in to modern CMake behaviors to avoid warnings with recent
