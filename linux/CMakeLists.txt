@@ -14,10 +14,12 @@ set(APPLICATION_ID "xyz.nokarin.frameextractor")
 cmake_policy(SET CMP0063 NEW)
 
 # Load bundled libraries from the lib/ directory relative to the binary.
-if(DEFINED ENV{FLATPAK_BUILD})
-  set(CMAKE_INSTALL_RPATH "/app/lib")
-else()
-  set(CMAKE_INSTALL_RPATH "$ORIGIN/lib")
+if(DART_DEFINES)
+  if(${DART_DEFINES} MATCHES "FLATPAK=true")
+    set(CMAKE_INSTALL_RPATH "/app/lib")
+  else()
+    set(CMAKE_INSTALL_RPATH "$ORIGIN/lib")
+  endif()
 endif()
 
 # Root filesystem for cross-building.
@@ -92,18 +94,20 @@ install(CODE "
   file(REMOVE_RECURSE \"${BUILD_BUNDLE_DIR}/\")
   " COMPONENT Runtime)
 
-if(DEFINED ENV{FLATPAK_BUILD})
-  set(INSTALL_BUNDLE_DATA_DIR "${CMAKE_INSTALL_PREFIX}/share/${APPLICATION_ID}data")
-  set(INSTALL_BUNDLE_LIB_DIR "${CMAKE_INSTALL_PREFIX}/lib/${APPLICATION_ID}")
+if(DART_DEFINES)
+  if(${DART_DEFINES} MATCHES "FLATPAK=true")
+    set(INSTALL_BUNDLE_DATA_DIR "${CMAKE_INSTALL_PREFIX}/share/${APPLICATION_ID}data")
+    set(INSTALL_BUNDLE_LIB_DIR "${CMAKE_INSTALL_PREFIX}/lib/${APPLICATION_ID}")
   
-  install(TARGETS ${BINARY_NAME} RUNTIME DESTINATION "${CMAKE_INSTALL_PREFIX}/share/${APPLICATION_ID}"
-    COMPONENT Runtime)
-else()
-  set(INSTALL_BUNDLE_DATA_DIR "${CMAKE_INSTALL_PREFIX}/data")
-  set(INSTALL_BUNDLE_LIB_DIR "${CMAKE_INSTALL_PREFIX}/lib")
+    install(TARGETS ${BINARY_NAME} RUNTIME DESTINATION "${CMAKE_INSTALL_PREFIX}/share/${APPLICATION_ID}"
+      COMPONENT Runtime)
+  else()
+    set(INSTALL_BUNDLE_DATA_DIR "${CMAKE_INSTALL_PREFIX}/data")
+    set(INSTALL_BUNDLE_LIB_DIR "${CMAKE_INSTALL_PREFIX}/lib")
   
-  install(TARGETS ${BINARY_NAME} RUNTIME DESTINATION "${CMAKE_INSTALL_PREFIX}"
-    COMPONENT Runtime)
+    install(TARGETS ${BINARY_NAME} RUNTIME DESTINATION "${CMAKE_INSTALL_PREFIX}"
+      COMPONENT Runtime)
+  endif()
 endif()
 
 install(FILES "${FLUTTER_ICU_DATA_FILE}" DESTINATION "${INSTALL_BUNDLE_DATA_DIR}"
@@ -121,8 +125,8 @@ endforeach(bundled_library)
 # Copy the native assets provided by the build.dart from all packages.
 set(NATIVE_ASSETS_DIR "${PROJECT_BUILD_DIR}native_assets/linux/")
 install(DIRECTORY "${NATIVE_ASSETS_DIR}"
-   DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
-   COMPONENT Runtime)
+  DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
+  COMPONENT Runtime)
 
 # Fully re-copy the assets directory on each build to avoid having stale files
 # from a previous install.
