@@ -9,17 +9,22 @@ set(BINARY_NAME "FrameExtractor")
 # https://wiki.gnome.org/HowDoI/ChooseApplicationID
 set(APPLICATION_ID "xyz.nokarin.frameextractor")
 
-# Get enviroment
-set(DART_DEFINES $ENV{DART_DEFINES})
+option(FLATPAK "Build for Flatpak" OFF)
+
+if($ENV{FLATPAK} STREQUAL "true")
+  set(FLATPAK ON)
+endif()
 
 # Explicitly opt in to modern CMake behaviors to avoid warnings with recent
 # versions of CMake.
 cmake_policy(SET CMP0063 NEW)
 
 # Load bundled libraries from the lib/ directory relative to the binary.
-if(DART_DEFINES MATCHES "FLATPAK=true")
+if(FLATPAK)
+  message(STATUS "Using Flatpak-specific RPATH settings")
   set(CMAKE_INSTALL_RPATH "/app/lib")
 else()
+  message(STATUS "Using default RPATH settings")
   set(CMAKE_INSTALL_RPATH "$ORIGIN/lib")
 endif()
 
@@ -95,8 +100,8 @@ install(CODE "
   file(REMOVE_RECURSE \"${BUILD_BUNDLE_DIR}/\")
   " COMPONENT Runtime)
 
-if(DART_DEFINES MATCHES "FLATPAK=true")
-  set(INSTALL_BUNDLE_DATA_DIR "${CMAKE_INSTALL_PREFIX}/share/${APPLICATION_ID}data")
+if(FLATPAK)
+  set(INSTALL_BUNDLE_DATA_DIR "${CMAKE_INSTALL_PREFIX}/share/${APPLICATION_ID}/data")
   set(INSTALL_BUNDLE_LIB_DIR "${CMAKE_INSTALL_PREFIX}/lib/${APPLICATION_ID}")
   install(TARGETS ${BINARY_NAME} RUNTIME DESTINATION "${CMAKE_INSTALL_PREFIX}/share/${APPLICATION_ID}"
     COMPONENT Runtime)

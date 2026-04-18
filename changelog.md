@@ -7,8 +7,8 @@ This project loosely follows Keep a Changelog and uses Semantic Versioning.
 ---
 
 ## [Unreleased]
-
-No Changes Yet.
+### Changed
+- Changes namespace `com.nokarin.FrameExtractor` -> `xyz.nokarin.FrameExtractor`
 
 ---
 
