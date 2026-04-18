@@ -49,6 +49,17 @@ static void frameextractor_activate(GApplication* application) {
   fl_dart_project_set_dart_entrypoint_arguments(
       project, self->dart_entrypoint_arguments);
 
+char exe_path[PATH_MAX];
+  ssize_t exePathLen = readlink("/proc/self/exe", exe_path, sizeof(exe_path) - 1);
+  if (exePathLen) {
+    exe_path[exePathLen] = '\0';
+    char* exe_dir = dirname(exe_path);
+
+    char aot_path[PATH_MAX];
+    snprintf(aot_path, sizeof(aot_path), "%s/../../lib/%s/libapp.so", exe_dir, APPLICATION_ID);
+    fl_dart_project_set_aot_library_path(project, aot_path);
+  }
+
   FlView* view = fl_view_new(project);
   GdkRGBA background_color;
 
@@ -57,12 +68,9 @@ static void frameextractor_activate(GApplication* application) {
   gtk_widget_show(GTK_WIDGET(view));
   gtk_container_add(GTK_CONTAINER(window), GTK_WIDGET(view));
 
-  g_signal_connect_swapped(view, "first-frame", G_CALLBACK(first_frame_cb),
-                           self);
+  g_signal_connect_swapped(view, "first-frame", G_CALLBACK(first_frame_cb), self);
   gtk_widget_realize(GTK_WIDGET(view));
-
   fl_register_plugins(FL_PLUGIN_REGISTRY(view));
-
   gtk_widget_grab_focus(GTK_WIDGET(view));
 }
 
