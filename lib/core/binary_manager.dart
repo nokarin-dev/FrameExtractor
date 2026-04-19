@@ -28,7 +28,7 @@ class BinaryManager {
   void _initDesktop({bool isPortable = false}) {
     if (_kFlatpak) {
       _ffmpegPath = 'ffmpeg';
-      _ytDlpPath = '/app/lib/yt-dlp';
+      _ytDlpPath = '/app/lib/yt-dlp/yt-dlp';
       return;
     }
 
