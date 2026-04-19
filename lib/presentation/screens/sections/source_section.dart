@@ -524,7 +524,7 @@ class _YtQualityRow extends StatelessWidget {
                     selected: selected == q,
                     disabled: disabled,
                     onTap: disabled ? null : () => onChanged(q),
-                    color: q == YouTubeQuality.audioOnly ? c.purple : c.accent,
+                    color: c.accent,
                     isGlass: theme.isGlass,
                     isDark: theme.isDark,
                   ),

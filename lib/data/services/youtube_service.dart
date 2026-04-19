@@ -13,8 +13,7 @@ enum YouTubeQuality {
   p1080('1080p', VideoResolution(1080, 1920)),
   p720('720p', VideoResolution(720, 1280)),
   p480('480p', VideoResolution(480, 854)),
-  p360('360p', VideoResolution(360, 640)),
-  audioOnly('Audio only', null);
+  p360('360p', VideoResolution(360, 640));
 
   final String label;
   final VideoResolution? resolution;
@@ -210,7 +209,6 @@ class YouTubeService {
         'bestvideo[height<=480]+bestaudio/best[height<=480]',
       YouTubeQuality.p360 =>
         'bestvideo[height<=360]+bestaudio/best[height<=360]',
-      YouTubeQuality.audioOnly => 'bestaudio/best',
       _ => 'bestvideo+bestaudio/best',
     };
   }
@@ -251,34 +249,29 @@ class YouTubeService {
       yt_explode.StreamInfo streamInfo;
       String ext;
 
-      if (quality == YouTubeQuality.audioOnly) {
-        streamInfo = manifest.audioOnly.withHighestBitrate();
-        ext = 'webm';
-      } else {
-        final muxed = manifest.muxed;
-        if (muxed.isEmpty) {
-          onLog?.call('[ERR] No muxed streams available');
-          return null;
-        }
-
-        yt_explode.MuxedStreamInfo? selected;
-        if (quality.resolution != null) {
-          final targetHeight = quality.resolution!.height;
-          selected = muxed
-              .where((s) => s.videoResolution.height <= targetHeight)
-              .fold<yt_explode.MuxedStreamInfo?>(
-                null,
-                (best, s) =>
-                    best == null ||
-                        s.videoResolution.height > best.videoResolution.height
-                    ? s
-                    : best,
-              );
-        }
-        selected ??= muxed.withHighestBitrate();
-        streamInfo = selected;
-        ext = selected.container.name;
+      final muxed = manifest.muxed;
+      if (muxed.isEmpty) {
+        onLog?.call('[ERR] No muxed streams available');
+        return null;
       }
+
+      yt_explode.MuxedStreamInfo? selected;
+      if (quality.resolution != null) {
+        final targetHeight = quality.resolution!.height;
+        selected = muxed
+            .where((s) => s.videoResolution.height <= targetHeight)
+            .fold<yt_explode.MuxedStreamInfo?>(
+          null,
+              (best, s) =>
+          best == null ||
+              s.videoResolution.height > best.videoResolution.height
+              ? s
+              : best,
+        );
+      }
+      selected ??= muxed.withHighestBitrate();
+      streamInfo = selected;
+      ext = selected.container.name;
 
       // Sanitize filename
       final safeTitle = video.title

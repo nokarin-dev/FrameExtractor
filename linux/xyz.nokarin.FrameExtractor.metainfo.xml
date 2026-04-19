@@ -77,8 +77,77 @@
         <release version="1.2.0" date="2026-04-13">
             <url type="details">https://github.com/nokarin-dev/FrameExtractor/releases/tag/v1.2.0</url>
             <description>
-                <p>Frame preview with video-bounded scrubber, batch extraction UI,
-                save-log button, and various bug fixes.</p>
+                <p>Major feature release with preset system, extraction history, frame preview, and batch extraction.</p>
+                <ul>
+                    <li>Preset system to save, browse, and apply named extraction presets</li>
+                    <li>Extraction history with one-click open folder and copy path</li>
+                    <li>Frame preview screen with scrubber and set-as-start/end controls</li>
+                    <li>Batch extraction across multiple time ranges in a single run</li>
+                    <li>Live frame count and estimated output size display</li>
+                    <li>Video metadata card showing duration, resolution, FPS, and codec</li>
+                    <li>Drag and drop video files onto the app window</li>
+                    <li>Settings persistence across sessions</li>
+                    <li>Real-time time range validation with inline error messages</li>
+                    <li>Close confirmation dialog when extraction is in progress</li>
+                </ul>
+            </description>
+        </release>
+        <release version="1.1.3" date="2026-04-02">
+            <url type="details">https://github.com/nokarin-dev/FrameExtractor/releases/tag/v1.1.3</url>
+            <description>
+                <p>Update checker, new application icon, and CI/CD fixes.</p>
+                <ul>
+                    <li>Added update checker</li>
+                    <li>New FrameExtractor application icon for Windows and Android</li>
+                    <li>Added RPM build support</li>
+                    <li>Fixed AppImage launch failure</li>
+                    <li>Fixed application crash on Android at startup</li>
+                </ul>
+            </description>
+        </release>
+        <release version="1.1.2" date="2026-03-26">
+            <url type="details">https://github.com/nokarin-dev/FrameExtractor/releases/tag/v1.1.2</url>
+            <description>
+                <p>Style and theme switcher, keyboard shortcuts, and Linux AppImage fix.</p>
+                <ul>
+                    <li>Classic and Liquid Glass (experimental) style switcher</li>
+                    <li>Dark and Light theme switcher</li>
+                    <li>Keyboard shortcuts: Space (Extract), Esc (Cancel), Ctrl+L (Log), Ctrl+S (Settings)</li>
+                    <li>Log and Settings now appear as dialogs on desktop</li>
+                    <li>Fixed Linux AppImage launch error caused by unexpanded variable in AppRun</li>
+                </ul>
+            </description>
+        </release>
+        <release version="1.1.1" date="2026-03-22">
+            <url type="details">https://github.com/nokarin-dev/FrameExtractor/releases/tag/v1.1.1</url>
+            <description>
+                <p>Android extraction fixes and UI improvements.</p>
+                <ul>
+                    <li>Fixed frame extraction on Android with Scoped Storage support</li>
+                    <li>Fixed YouTube download error on Android external storage</li>
+                    <li>Improved SAF URI resolution with fallback to writable app directory</li>
+                    <li>Mouse cursor and text cursor improvements on interactive elements</li>
+                    <li>Hint bar below Extract button explaining required selections</li>
+                    <li>Clear button on video file and output folder rows</li>
+                    <li>Color-coded log lines and log line count badge</li>
+                    <li>Progress card background tinted by current phase</li>
+                </ul>
+            </description>
+        </release>
+        <release version="1.1.0" date="2026-03-21">
+            <url type="details">https://github.com/nokarin-dev/FrameExtractor/releases/tag/v1.1.0</url>
+            <description>
+                <p>Initial release with local and YouTube extraction.</p>
+                <ul>
+                    <li>Extract frames from local video files with start/end time control</li>
+                    <li>Extract frames directly from YouTube URLs via yt-dlp</li>
+                    <li>Adjustable FPS (1–60), format (PNG, JPG, WebP, BMP), quality, and scale</li>
+                    <li>Custom filename prefix for extracted frames</li>
+                    <li>Real-time log panel with copy-to-clipboard support</li>
+                    <li>Live progress tracking with percentage, frame count, and ETA</li>
+                    <li>Bundled ffmpeg and yt-dlp — no manual installation needed</li>
+                    <li>Support for Windows, Linux, and Android</li>
+                </ul>
             </description>
         </release>
     </releases>
