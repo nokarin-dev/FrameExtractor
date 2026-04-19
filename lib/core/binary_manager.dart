@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 
 const bool _kFlatpak = bool.fromEnvironment('FLATPAK');
+
 class BinaryManager {
   BinaryManager._();
   static final BinaryManager instance = BinaryManager._();
@@ -27,7 +28,7 @@ class BinaryManager {
   void _initDesktop({bool isPortable = false}) {
     if (_kFlatpak) {
       _ffmpegPath = 'ffmpeg';
-      _ytDlpPath = '/app/bin/bin/yt-dlp';
+      _ytDlpPath = '/app/lib/yt-dlp';
       return;
     }
 
