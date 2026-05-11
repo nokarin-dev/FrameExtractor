@@ -46,29 +46,28 @@
     </categories>
 
     <screenshots>
-        <!-- raw.githubusercontent.com permalinks — immutable, serves actual image bytes -->
         <screenshot type="default">
-            <image>https://raw.githubusercontent.com/nokarin-dev/FrameExtractor/1472f252dd6ed6ec45e0a43474a489389bb42fe4/assets/preview/HomeScreen_Local.png</image>
+            <image>https://raw.githubusercontent.com/nokarin-dev/FrameExtractor/2051f906ba893f7a87302727bd2654b8413c1a04/assets/preview/HomeScreen_Local.png</image>
             <caption>Home Screen - Local File</caption>
         </screenshot>
         <screenshot>
-            <image>https://raw.githubusercontent.com/nokarin-dev/FrameExtractor/1472f252dd6ed6ec45e0a43474a489389bb42fe4/assets/preview/HomeScreen_Youtube.png</image>
+            <image>https://raw.githubusercontent.com/nokarin-dev/FrameExtractor/2051f906ba893f7a87302727bd2654b8413c1a04/assets/preview/HomeScreen_Youtube.png</image>
             <caption>Home Screen - YouTube</caption>
         </screenshot>
         <screenshot>
-            <image>https://raw.githubusercontent.com/nokarin-dev/FrameExtractor/1472f252dd6ed6ec45e0a43474a489389bb42fe4/assets/preview/SettingsScreen.png</image>
+            <image>https://raw.githubusercontent.com/nokarin-dev/FrameExtractor/2051f906ba893f7a87302727bd2654b8413c1a04/assets/preview/SettingsScreen.png</image>
             <caption>Settings</caption>
         </screenshot>
         <screenshot>
-            <image>https://raw.githubusercontent.com/nokarin-dev/FrameExtractor/1472f252dd6ed6ec45e0a43474a489389bb42fe4/assets/preview/LogScreen.png</image>
+            <image>https://raw.githubusercontent.com/nokarin-dev/FrameExtractor/2051f906ba893f7a87302727bd2654b8413c1a04/assets/preview/LogScreen.png</image>
             <caption>Log Panel</caption>
         </screenshot>
         <screenshot>
-            <image>https://raw.githubusercontent.com/nokarin-dev/FrameExtractor/1472f252dd6ed6ec45e0a43474a489389bb42fe4/assets/preview/PresetScreen.png</image>
+            <image>https://raw.githubusercontent.com/nokarin-dev/FrameExtractor/2051f906ba893f7a87302727bd2654b8413c1a04/assets/preview/PresetScreen.png</image>
             <caption>Presets</caption>
         </screenshot>
         <screenshot>
-            <image>https://raw.githubusercontent.com/nokarin-dev/FrameExtractor/1472f252dd6ed6ec45e0a43474a489389bb42fe4/assets/preview/HistoryScreen.png</image>
+            <image>https://raw.githubusercontent.com/nokarin-dev/FrameExtractor/2051f906ba893f7a87302727bd2654b8413c1a04/assets/preview/HistoryScreen.png</image>
             <caption>Extraction History</caption>
         </screenshot>
     </screenshots>
