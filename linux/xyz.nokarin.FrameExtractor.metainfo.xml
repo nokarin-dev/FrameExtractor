@@ -45,6 +45,11 @@
         <category>AudioVideo</category>
     </categories>
 
+    <branding>
+        <color type="primary" scheme_preference="light">#e999ff</color>
+        <color type="primary" scheme_preference="dark">#8c409c</color>
+    </branding>
+
     <screenshots>
         <screenshot type="default">
             <image>https://raw.githubusercontent.com/nokarin-dev/FrameExtractor/2051f906ba893f7a87302727bd2654b8413c1a04/assets/preview/HomeScreen_Local.png</image>
